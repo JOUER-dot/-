@@ -12,6 +12,9 @@ import ProductList from '@/views/advisor/ProductList.vue'
 import ProductEdit from '@/views/advisor/ProductEdit.vue'
 import ReviewPendingList from '@/views/review/ReviewPendingList.vue'
 import ReviewDetail from '@/views/review/ReviewDetail.vue'
+import AdvisorZoneList from '@/views/public/AdvisorZoneList.vue'
+import AdvisorZoneDetail from '@/views/public/AdvisorZoneDetail.vue'
+import MySubscriptions from '@/views/public/MySubscriptions.vue'
 
 const HomeView = defineComponent({
   name: 'HomeView',
@@ -62,12 +65,30 @@ const router = createRouter({
     {
       path: '/advisor-zone',
       name: 'AdvisorZone',
-      component: HomeView,
+      component: AdvisorZoneList,
+      meta: {
+        title: '基金投顾产品专区',
+        description: '用户端产品专区列表页'
+      }
+    },
+    {
+      path: '/advisor-zone/:id',
+      name: 'AdvisorZoneDetail',
+      component: AdvisorZoneDetail,
+      meta: {
+        title: '产品详情',
+        description: '用户端产品详情页'
+      }
+    },
+    {
+      path: '/my-subscriptions',
+      name: 'MySubscriptions',
+      component: MySubscriptions,
       meta: {
         requiresAuth: true,
         roles: ['USER'],
-        title: '基金投顾产品专区',
-        description: '这是 USER 角色的默认首页占位页；模块五完成后将替换为正式专区列表页。'
+        title: '我的订阅',
+        description: '用户端我的订阅页'
       }
     },
     {
