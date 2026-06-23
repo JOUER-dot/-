@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.product.mapper.ProductVersionMapper">
+
+    <resultMap id="ProductVersionResultMap" type="com.finance.roboadvisor.product.entity.AdvisorProductVersion">
+        <id property="id" column="id"/>
+        <result property="productId" column="product_id"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="baseInfoJson" column="base_info_json"/>
+        <result property="paramsJson" column="params_json"/>
+        <result property="versionStatus" column="version_status"/>
+        <result property="statusAtSubmit" column="status_at_submit"/>
+        <result property="submittedAt" column="submitted_at"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.finance.roboadvisor.product.entity.AdvisorProductVersion" useGeneratedKeys="true" keyProperty="id">
+        insert into advisor_product_version (
+            product_id, version_no, base_info_json, params_json, version_status,
+            status_at_submit, submitted_at
+        ) values (
+            #{productId}, #{versionNo}, #{baseInfoJson}, #{paramsJson}, #{versionStatus},
+            #{statusAtSubmit}, #{submittedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="ProductVersionResultMap">
+        select id, product_id, version_no, base_info_json, params_json, version_status,
+               status_at_submit, submitted_at, created_at
+        from advisor_product_version
+        where id = #{id}
+    </select>
+
+    <select id="selectLatestSubmittedByProductId" resultMap="ProductVersionResultMap">
+        select id, product_id, version_no, base_info_json, params_json, version_status,
+               status_at_submit, submitted_at, created_at
+        from advisor_product_version
+        where product_id = #{productId}
+          and version_status = 'SUBMITTED'
+        order by version_no desc
+        limit 1
+    </select>
+
+    <select id="selectByProductAndVersionNo" resultMap="ProductVersionResultMap">
+        select id, product_id, version_no, base_info_json, params_json, version_status,
+               status_at_submit, submitted_at, created_at
+        from advisor_product_version
+        where product_id = #{productId}
+          and version_no = #{versionNo}
+        limit 1
+    </select>
+
+    <update id="updateVersionStatus">
+        update advisor_product_version
+        set version_status = #{versionStatus}
+        where id = #{id}
+    </update>
+</mapper>

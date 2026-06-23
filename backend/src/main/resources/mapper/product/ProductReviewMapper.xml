@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.product.mapper.ProductReviewMapper">
+
+    <select id="selectByProductId" resultType="com.finance.roboadvisor.product.vo.ReviewRecordVO">
+        select r.result as result,
+               r.comment as comment,
+               u.nickname as reviewerName,
+               r.reviewed_at as reviewedAt
+        from advisor_product_review r
+                 inner join sys_user u on u.id = r.reviewer_id
+        where r.product_id = #{productId}
+        order by r.reviewed_at desc, r.id desc
+    </select>
+</mapper>

@@ -16,4 +16,6 @@ public interface FundMapper {
 
     Long countEnabledFunds(@Param("keyword") String keyword,
                            @Param("fundType") String fundType);
+
+    List<FundOptionVO> selectEnabledFundsByIds(@Param("ids") List<Long> ids);
 }

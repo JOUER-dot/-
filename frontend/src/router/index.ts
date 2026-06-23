@@ -8,6 +8,8 @@ import { setupRouterGuards } from '@/router/guards'
 import Login from '@/views/auth/Login.vue'
 import Register from '@/views/auth/Register.vue'
 import Forbidden from '@/views/error/Forbidden.vue'
+import ProductList from '@/views/advisor/ProductList.vue'
+import ProductEdit from '@/views/advisor/ProductEdit.vue'
 
 const HomeView = defineComponent({
   name: 'HomeView',
@@ -69,12 +71,45 @@ const router = createRouter({
     {
       path: '/admin/products',
       name: 'AdminProducts',
-      component: HomeView,
+      component: ProductList,
       meta: {
         requiresAuth: true,
         roles: ['ADVISOR'],
         title: '组合产品管理',
-        description: '这是 ADVISOR 角色的默认首页占位页；模块三完成后将替换为产品管理页。'
+        description: '投顾产品列表页'
+      }
+    },
+    {
+      path: '/admin/products/create',
+      name: 'AdvisorProductCreate',
+      component: ProductEdit,
+      meta: {
+        requiresAuth: true,
+        roles: ['ADVISOR'],
+        title: '创建产品',
+        description: '投顾创建产品草稿页'
+      }
+    },
+    {
+      path: '/admin/products/:id/edit',
+      name: 'AdvisorProductEdit',
+      component: ProductEdit,
+      meta: {
+        requiresAuth: true,
+        roles: ['ADVISOR'],
+        title: '编辑草稿',
+        description: '投顾编辑产品草稿页'
+      }
+    },
+    {
+      path: '/admin/products/:id',
+      name: 'AdvisorProductDetail',
+      component: ProductEdit,
+      meta: {
+        requiresAuth: true,
+        roles: ['ADVISOR'],
+        title: '产品详情',
+        description: '投顾查看产品详情页'
       }
     },
     {
