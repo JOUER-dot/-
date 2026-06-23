@@ -1,15 +1,22 @@
 import type { Router } from 'vue-router'
 
 import { useUserStore } from '@/stores/user'
+import { getDefaultHomeByRoles } from '@/utils/role-home'
 
 export function setupRouterGuards(router: Router) {
   let restoring = false
 
-  router.beforeEach(async (to) => {
+  router.beforeEach(async (to, from) => {
     const userStore = useUserStore()
     const requiresAuth = Boolean(to.meta.requiresAuth)
     const guestOnly = Boolean(to.meta.guestOnly)
     const requiredRoles = (to.meta.roles as string[] | undefined) ?? []
+    const isDev = import.meta.env.DEV
+    const isInitialNavigation = !from.name
+
+    if (isDev && isInitialNavigation && to.path === '/') {
+      return '/login'
+    }
 
     if (userStore.token && !userStore.userInfo && !restoring) {
       restoring = true
@@ -27,8 +34,8 @@ export function setupRouterGuards(router: Router) {
       }
     }
 
-    if (guestOnly && userStore.isLoggedIn) {
-      return '/'
+    if (guestOnly && userStore.isLoggedIn && !isDev) {
+      return getDefaultHomeByRoles(userStore.roles)
     }
 
     if (requiresAuth && !userStore.isLoggedIn) {

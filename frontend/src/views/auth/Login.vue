@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 
 import { useUserStore } from '@/stores/user'
+import { getDefaultHomeByRoles } from '@/utils/role-home'
 
 const router = useRouter()
 const route = useRoute()
@@ -33,7 +34,10 @@ const handleLogin = async () => {
     try {
       await userStore.login(form)
       ElMessage.success('登录成功')
-      const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+      const redirect =
+        typeof route.query.redirect === 'string'
+          ? route.query.redirect
+          : getDefaultHomeByRoles(userStore.roles)
       await router.replace(redirect)
     } finally {
       loading.value = false
