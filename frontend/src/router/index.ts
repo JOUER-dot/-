@@ -10,6 +10,8 @@ import Register from '@/views/auth/Register.vue'
 import Forbidden from '@/views/error/Forbidden.vue'
 import ProductList from '@/views/advisor/ProductList.vue'
 import ProductEdit from '@/views/advisor/ProductEdit.vue'
+import ReviewPendingList from '@/views/review/ReviewPendingList.vue'
+import ReviewDetail from '@/views/review/ReviewDetail.vue'
 
 const HomeView = defineComponent({
   name: 'HomeView',
@@ -115,12 +117,23 @@ const router = createRouter({
     {
       path: '/review/pending',
       name: 'ReviewPending',
-      component: HomeView,
+      component: ReviewPendingList,
       meta: {
         requiresAuth: true,
         roles: ['REVIEWER'],
         title: '待审列表',
-        description: '这是 REVIEWER 角色的默认首页占位页；模块四完成后将替换为审核待办页。'
+        description: '审核员待审列表页'
+      }
+    },
+    {
+      path: '/review/pending/:id',
+      name: 'ReviewDetail',
+      component: ReviewDetail,
+      meta: {
+        requiresAuth: true,
+        roles: ['REVIEWER'],
+        title: '审核详情',
+        description: '审核员审核详情页'
       }
     },
     {

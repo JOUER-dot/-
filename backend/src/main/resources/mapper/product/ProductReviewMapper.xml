@@ -4,6 +4,11 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.finance.roboadvisor.product.mapper.ProductReviewMapper">
 
+    <insert id="insert" parameterType="com.finance.roboadvisor.product.entity.AdvisorProductReview" useGeneratedKeys="true" keyProperty="id">
+        insert into advisor_product_review (product_id, product_version_id, reviewer_id, result, comment)
+        values (#{productId}, #{productVersionId}, #{reviewerId}, #{result}, #{comment})
+    </insert>
+
     <select id="selectByProductId" resultType="com.finance.roboadvisor.product.vo.ReviewRecordVO">
         select r.result as result,
                r.comment as comment,

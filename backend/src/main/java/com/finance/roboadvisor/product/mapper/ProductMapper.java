@@ -19,6 +19,14 @@ public interface ProductMapper {
 
     int updateStatus(@Param("id") Long id, @Param("status") String status);
 
+    int updateApprovedReviewOutcome(@Param("id") Long id,
+                                    @Param("status") String status,
+                                    @Param("publishedVersionNo") Integer publishedVersionNo);
+
+    int updateRejectedReviewOutcome(@Param("id") Long id,
+                                    @Param("status") String status,
+                                    @Param("lastRejectComment") String lastRejectComment);
+
     AdvisorProduct selectById(@Param("id") Long id);
 
     List<AdvisorProduct> selectByCreator(@Param("creatorId") Long creatorId,

@@ -1,5 +1,6 @@
 package com.finance.roboadvisor.product.mapper;
 
+import com.finance.roboadvisor.product.entity.AdvisorProductReview;
 import com.finance.roboadvisor.product.vo.ReviewRecordVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -8,6 +9,8 @@ import java.util.List;
 
 @Mapper
 public interface ProductReviewMapper {
+
+    int insert(AdvisorProductReview review);
 
     List<ReviewRecordVO> selectByProductId(@Param("productId") Long productId);
 }

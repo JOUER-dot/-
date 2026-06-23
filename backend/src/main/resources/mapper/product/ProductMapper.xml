@@ -81,6 +81,23 @@
         where id = #{id}
     </update>
 
+    <update id="updateApprovedReviewOutcome">
+        update advisor_product
+        set status = #{status},
+            published_version_no = #{publishedVersionNo},
+            last_reject_comment = null,
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="updateRejectedReviewOutcome">
+        update advisor_product
+        set status = #{status},
+            last_reject_comment = #{lastRejectComment},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
     <select id="selectById" resultMap="ProductResultMap">
         select <include refid="BaseColumns"/>
         from advisor_product
