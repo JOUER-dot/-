@@ -3,6 +3,8 @@ import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+import PageHeader from '@/components/common/PageHeader.vue'
+import SectionNav, { type SectionNavItem } from '@/components/common/SectionNav.vue'
 import ProductBaseForm from '@/components/product/ProductBaseForm.vue'
 import ProductParamForm from '@/components/product/ProductParamForm.vue'
 import ComponentEditor from '@/components/product/ComponentEditor.vue'
@@ -71,6 +73,42 @@ const pageTitle = computed(() => {
 const weightTotal = computed(() =>
   productForm.components.reduce((sum, item) => sum + Number(item.weight || 0), 0)
 )
+
+const summaryCards = computed(() => {
+  const missingBase =
+    !productForm.name.trim() || !productForm.type || !productForm.riskLevel
+  const componentOk = productForm.components.length > 0
+  const weightOk = Math.abs(weightTotal.value - 1) < 0.000001
+  return [
+    {
+      label: '基础信息',
+      value: missingBase ? '待完善' : '已完成',
+      hint: missingBase ? '名称 / 类型 / 风险等级必填' : '可以继续完善策略参数'
+    },
+    {
+      label: '基金成份',
+      value: componentOk ? `${productForm.components.length} 只` : '未选择',
+      hint: componentOk ? '建议检查成份风险与分布' : '提交前至少选择 1 只基金'
+    },
+    {
+      label: '权重合计',
+      value: weightOk ? '1.0000' : weightTotal.value.toFixed(4),
+      hint: weightOk ? '满足提交审核条件' : '提交审核前必须等于 1.0000'
+    },
+    {
+      label: '当前状态',
+      value: productForm.status,
+      hint: readOnly.value ? '仅可查看' : '可编辑草稿并提交审核'
+    }
+  ]
+})
+
+const sections = computed<SectionNavItem[]>(() => [
+  { id: 'section-base', label: '基础信息', hint: productForm.name ? '已填写' : '待填写' },
+  { id: 'section-params', label: '策略参数', hint: productForm.strategyCode ? '已配置' : '可选' },
+  { id: 'section-components', label: '基金成份', hint: `${productForm.components.length} 只` },
+  { id: 'section-review', label: '审核记录', hint: `${productForm.reviewSummary.length} 条` }
+])
 
 const fillForm = (detail: ProductDetail) => {
   productForm.id = detail.id
@@ -246,38 +284,36 @@ void loadDetail()
 </script>
 
 <template>
-  <div v-loading="loading" class="page-container">
-    <div class="page-header">
-      <div>
-        <h1>{{ pageTitle }}</h1>
-        <p>草稿编辑、成份维护、提交审核与撤回审核都在同一页面内完成。</p>
+  <div v-loading="loading" class="app-page">
+    <PageHeader :title="pageTitle" description="草稿编辑、成份维护、提交审核与撤回审核都在同一页面内完成。" />
+
+    <div class="sticky-actions">
+      <div class="sticky-actions__inner">
+        <div class="sticky-actions__title">
+          <strong>{{ pageTitle }}</strong>
+          <span>建议按“基础信息 → 策略参数 → 成份维护 → 提交审核”顺序完成</span>
+        </div>
+        <div class="sticky-actions__buttons">
+          <el-button @click="router.push('/admin/products')">返回列表</el-button>
+          <el-button v-if="!readOnly" type="primary" :loading="saving" @click="handleSaveDraft">保存草稿</el-button>
+          <el-button v-if="!readOnly" type="success" :loading="submitting" @click="handleSubmit">提交审核</el-button>
+          <el-button
+            v-if="productForm.status === 'PENDING_REVIEW'"
+            type="warning"
+            :loading="withdrawing"
+            @click="handleWithdraw"
+          >
+            撤回审核
+          </el-button>
+        </div>
       </div>
-      <div class="header-actions">
-        <el-button @click="router.push('/admin/products')">返回列表</el-button>
-        <el-button
-          v-if="!readOnly"
-          type="primary"
-          :loading="saving"
-          @click="handleSaveDraft"
-        >
-          保存草稿
-        </el-button>
-        <el-button
-          v-if="!readOnly"
-          type="success"
-          :loading="submitting"
-          @click="handleSubmit"
-        >
-          提交审核
-        </el-button>
-        <el-button
-          v-if="productForm.status === 'PENDING_REVIEW'"
-          type="warning"
-          :loading="withdrawing"
-          @click="handleWithdraw"
-        >
-          撤回审核
-        </el-button>
+    </div>
+
+    <div class="summary-grid">
+      <div v-for="item in summaryCards" :key="item.label" class="summary-card">
+        <div class="summary-card__label">{{ item.label }}</div>
+        <div class="summary-card__value">{{ item.value }}</div>
+        <div class="summary-card__hint">{{ item.hint }}</div>
       </div>
     </div>
 
@@ -300,89 +336,72 @@ void loadDetail()
       class="mb-16"
     />
 
-    <ProductBaseForm
-      :model-value="productForm"
-      :read-only="readOnly"
-    />
+    <div class="content-grid">
+      <div class="content-grid__main">
+        <div id="section-base" class="section-anchor"></div>
+        <ProductBaseForm :model-value="productForm" :read-only="readOnly" />
 
-    <ProductParamForm
-      :model-value="productForm.params"
-      :read-only="readOnly"
-      @update:model-value="(value) => (productForm.params = value)"
-    />
+        <div id="section-params" class="section-anchor"></div>
+        <ProductParamForm
+          :model-value="productForm.params"
+          :read-only="readOnly"
+          @update:model-value="(value) => (productForm.params = value)"
+        />
 
-    <ComponentEditor
-      :model-value="productForm.components"
-      :read-only="readOnly"
-      @update:model-value="(value) => (productForm.components = value)"
-    />
+        <div id="section-components" class="section-anchor"></div>
+        <ComponentEditor
+          :model-value="productForm.components"
+          :read-only="readOnly"
+          @update:model-value="(value) => (productForm.components = value)"
+        />
 
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-title">审核记录</div>
-      </template>
-      <el-empty v-if="productForm.reviewSummary.length === 0" description="暂无审核记录" />
-      <el-timeline v-else>
-        <el-timeline-item
-          v-for="(item, index) in productForm.reviewSummary"
-          :key="index"
-          :timestamp="item.reviewedAt"
-        >
-          <div class="review-item-title">{{ item.result }} / {{ item.reviewerName || '审核人' }}</div>
-          <div class="review-item-comment">{{ item.comment || '无审核意见' }}</div>
-        </el-timeline-item>
-      </el-timeline>
-    </el-card>
+        <div id="section-review" class="section-anchor"></div>
+        <el-card shadow="never" class="section-card">
+          <template #header>
+            <div class="section-title">审核记录</div>
+          </template>
+          <el-empty v-if="productForm.reviewSummary.length === 0" description="暂无审核记录" />
+          <el-timeline v-else>
+            <el-timeline-item
+              v-for="(item, index) in productForm.reviewSummary"
+              :key="index"
+              :timestamp="item.reviewedAt"
+            >
+              <div class="review-item-title">{{ item.result }} / {{ item.reviewerName || '审核人' }}</div>
+              <div class="review-item-comment">{{ item.comment || '无审核意见' }}</div>
+            </el-timeline-item>
+          </el-timeline>
+        </el-card>
 
-    <el-card v-if="productForm.publishedVersion" shadow="never" class="section-card">
-      <template #header>
-        <div class="section-title">已发布版本</div>
-      </template>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="版本号">
-          V{{ productForm.publishedVersion.versionNo }}
-        </el-descriptions-item>
-        <el-descriptions-item label="版本状态">
-          {{ productForm.publishedVersion.versionStatus }}
-        </el-descriptions-item>
-        <el-descriptions-item label="提交时间">
-          {{ productForm.publishedVersion.submittedAt || '-' }}
-        </el-descriptions-item>
-      </el-descriptions>
-    </el-card>
+        <el-card v-if="productForm.publishedVersion" shadow="never" class="section-card">
+          <template #header>
+            <div class="section-title">已发布版本</div>
+          </template>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="版本号">
+              V{{ productForm.publishedVersion.versionNo }}
+            </el-descriptions-item>
+            <el-descriptions-item label="版本状态">
+              {{ productForm.publishedVersion.versionStatus }}
+            </el-descriptions-item>
+            <el-descriptions-item label="提交时间">
+              {{ productForm.publishedVersion.submittedAt || '-' }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+      </div>
+      <div class="content-grid__side">
+        <SectionNav :sections="sections" :offset-top="124" />
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.page-container {
-  min-height: calc(100vh - 48px);
-  padding: 24px;
-  background: #f5f7fa;
-}
-
-.page-header {
-  margin-bottom: 16px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.page-header h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  color: #303133;
-}
-
-.page-header p {
-  margin: 0;
-  color: #606266;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.section-anchor {
+  position: relative;
+  top: -124px;
+  height: 0;
 }
 
 .section-card {

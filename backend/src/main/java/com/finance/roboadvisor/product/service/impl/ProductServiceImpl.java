@@ -23,7 +23,10 @@ import com.finance.roboadvisor.product.mapper.ProductFlowLogMapper;
 import com.finance.roboadvisor.product.mapper.ProductMapper;
 import com.finance.roboadvisor.product.mapper.ProductReviewMapper;
 import com.finance.roboadvisor.product.mapper.ProductVersionMapper;
+import com.finance.roboadvisor.product.service.ProductHoldingSnapshotGenerationService;
+import com.finance.roboadvisor.product.service.ProductNavGenerationService;
 import com.finance.roboadvisor.product.service.ProductService;
+import com.finance.roboadvisor.product.service.StrategyRuleValidationService;
 import com.finance.roboadvisor.product.vo.DraftComponentVO;
 import com.finance.roboadvisor.product.vo.ProductCreateVO;
 import com.finance.roboadvisor.product.vo.ProductDetailVO;
@@ -49,6 +52,8 @@ public class ProductServiceImpl implements ProductService {
 
     private static final String STATUS_DRAFT = "DRAFT";
     private static final String STATUS_PENDING_REVIEW = "PENDING_REVIEW";
+    private static final String STATUS_PUBLISHED = "PUBLISHED";
+    private static final String STATUS_OFFLINE = "OFFLINE";
     private static final String STATUS_REJECTED = "REJECTED";
     private static final String VERSION_SUBMITTED = "SUBMITTED";
     private static final String VERSION_WITHDRAWN = "WITHDRAWN";
@@ -66,6 +71,9 @@ public class ProductServiceImpl implements ProductService {
     private final ProductReviewMapper productReviewMapper;
     private final ProductFlowLogMapper productFlowLogMapper;
     private final FundMapper fundMapper;
+    private final ProductNavGenerationService productNavGenerationService;
+    private final ProductHoldingSnapshotGenerationService productHoldingSnapshotGenerationService;
+    private final StrategyRuleValidationService strategyRuleValidationService;
     private final ObjectMapper objectMapper;
 
     public ProductServiceImpl(ProductMapper productMapper,
@@ -76,6 +84,9 @@ public class ProductServiceImpl implements ProductService {
                               ProductReviewMapper productReviewMapper,
                               ProductFlowLogMapper productFlowLogMapper,
                               FundMapper fundMapper,
+                              ProductNavGenerationService productNavGenerationService,
+                              ProductHoldingSnapshotGenerationService productHoldingSnapshotGenerationService,
+                              StrategyRuleValidationService strategyRuleValidationService,
                               ObjectMapper objectMapper) {
         this.productMapper = productMapper;
         this.productDraftMapper = productDraftMapper;
@@ -85,6 +96,9 @@ public class ProductServiceImpl implements ProductService {
         this.productReviewMapper = productReviewMapper;
         this.productFlowLogMapper = productFlowLogMapper;
         this.fundMapper = fundMapper;
+        this.productNavGenerationService = productNavGenerationService;
+        this.productHoldingSnapshotGenerationService = productHoldingSnapshotGenerationService;
+        this.strategyRuleValidationService = strategyRuleValidationService;
         this.objectMapper = objectMapper;
     }
 
@@ -253,6 +267,12 @@ public class ProductServiceImpl implements ProductService {
         if (enabledFunds.size() != new LinkedHashSet<>(fundIds).size()) {
             throw new BusinessException(ResultCode.FUND_DISABLED, "存在不存在或已停用基金，不能提交审核");
         }
+        strategyRuleValidationService.validateOrThrow(
+                product.getStrategyCode(),
+                product.getType(),
+                draftComponents,
+                null
+        );
         Map<Long, FundOptionVO> fundMap = enabledFunds.stream()
                 .collect(Collectors.toMap(FundOptionVO::getId, item -> item));
 
@@ -298,6 +318,28 @@ public class ProductServiceImpl implements ProductService {
         productMapper.updateStatus(productId, STATUS_DRAFT);
         productVersionMapper.updateVersionStatus(submittedVersion.getId(), VERSION_WITHDRAWN);
         insertFlowLog(productId, submittedVersion.getId(), currentUserId, FLOW_WITHDRAW, "撤回审核");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void offlineProduct(Long productId) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        AdvisorProduct product = getOwnedProduct(productId, currentUserId);
+        if (!STATUS_PUBLISHED.equals(product.getStatus())) {
+            throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "当前产品不处于可下架状态");
+        }
+        productMapper.updateStatus(productId, STATUS_OFFLINE);
+    }
+
+    @Override
+    public void generateProductNav(Long productId) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        AdvisorProduct product = getOwnedProduct(productId, currentUserId);
+        if (!STATUS_PUBLISHED.equals(product.getStatus()) || product.getPublishedVersionNo() == null) {
+            throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "当前产品还没有可重算的已发布版本");
+        }
+        productNavGenerationService.generatePublishedProductNav(productId);
+        productHoldingSnapshotGenerationService.generatePublishedHoldingSnapshot(productId);
     }
 
     @Override

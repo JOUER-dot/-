@@ -28,5 +28,9 @@ public interface ProductService {
 
     void withdrawProduct(Long productId);
 
+    void offlineProduct(Long productId);
+
+    void generateProductNav(Long productId);
+
     List<ReviewRecordVO> listReviews(Long productId);
 }

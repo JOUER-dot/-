@@ -1,6 +1,8 @@
 import axios, { type AxiosError, type AxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 
+import { emitAuthEvent } from '@/utils/auth-events'
+
 type ApiResponse<T> = {
   code: number
   message: string
@@ -25,12 +27,8 @@ function getStoredToken() {
   }
 }
 
-function clearAuthAndRedirect() {
+function clearAuth() {
   localStorage.removeItem(AUTH_STORAGE_KEY)
-  const current = window.location.pathname + window.location.search
-  if (!window.location.pathname.startsWith('/login')) {
-    window.location.href = `/login?redirect=${encodeURIComponent(current)}`
-  }
 }
 
 const service = axios.create({
@@ -53,14 +51,14 @@ service.interceptors.response.use(
     const message = error.response?.data?.message || error.message || '请求失败'
     if (status === 401) {
       ElMessage.error('登录已失效，请重新登录')
-      clearAuthAndRedirect()
+      clearAuth()
+      emitAuthEvent('logout', { reason: 'unauthorized' })
       return Promise.reject(error)
     }
     if (status === 403) {
       ElMessage.error('无权限访问')
-      if (!window.location.pathname.startsWith('/403')) {
-        window.location.href = '/403'
-      }
+      clearAuth()
+      emitAuthEvent('logout', { reason: 'forbidden' })
       return Promise.reject(error)
     }
     ElMessage.error(message)

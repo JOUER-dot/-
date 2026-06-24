@@ -7,6 +7,7 @@ export interface MySubscriptionItem {
   type: string
   riskLevel: string
   status: string
+  productStatus: string
   latestNav?: number
   latestCumReturn?: number
   subscribedAt: string
@@ -14,6 +15,10 @@ export interface MySubscriptionItem {
 
 export function subscribeProduct(productId: number) {
   return request.post<void>(`/public/advisor-products/${productId}/subscribe`)
+}
+
+export function unsubscribeProduct(productId: number) {
+  return request.post<void>(`/public/advisor-products/${productId}/unsubscribe`)
 }
 
 export function getMySubscriptions() {

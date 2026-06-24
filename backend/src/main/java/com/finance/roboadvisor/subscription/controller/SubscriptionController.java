@@ -27,6 +27,12 @@ public class SubscriptionController {
         return ApiResult.success("订阅成功");
     }
 
+    @PostMapping("/api/public/advisor-products/{id}/unsubscribe")
+    public ApiResult<Void> unsubscribe(@PathVariable("id") Long productId) {
+        subscriptionService.unsubscribe(productId);
+        return ApiResult.success("取消订阅成功");
+    }
+
     @GetMapping("/api/auth/my-subscriptions")
     public ApiResult<List<MySubscriptionItemVO>> listMySubscriptions() {
         return ApiResult.success(subscriptionService.listMySubscriptions());

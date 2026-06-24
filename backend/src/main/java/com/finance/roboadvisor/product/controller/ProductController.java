@@ -69,6 +69,18 @@ public class ProductController {
         return ApiResult.success("撤回审核成功");
     }
 
+    @PostMapping("/{id}/offline")
+    public ApiResult<Void> offlineProduct(@PathVariable("id") Long productId) {
+        productService.offlineProduct(productId);
+        return ApiResult.success("下架成功");
+    }
+
+    @PostMapping("/{id}/nav/generate")
+    public ApiResult<Void> generateProductNav(@PathVariable("id") Long productId) {
+        productService.generateProductNav(productId);
+        return ApiResult.success("净值与持仓快照重算成功");
+    }
+
     @GetMapping("/{id}/reviews")
     public ApiResult<List<ReviewRecordVO>> listReviews(@PathVariable("id") Long productId) {
         return ApiResult.success(productService.listReviews(productId));

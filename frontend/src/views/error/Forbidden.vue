@@ -5,6 +5,15 @@ import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
+
+const handlePrimary = async () => {
+  await router.push(userStore.isLoggedIn ? '/' : '/login')
+}
+
+const handleLogout = async () => {
+  await userStore.logout()
+  await router.replace('/login')
+}
 </script>
 
 <template>
@@ -13,11 +22,14 @@ const userStore = useUserStore()
       <div class="forbidden-code">403</div>
       <h1>无权限访问</h1>
       <p>当前角色没有访问该页面或功能的权限，请返回首页或切换账号后重试。</p>
+      <div class="hint">
+        {{ userStore.isLoggedIn ? '如需切换角色，请先退出登录后重新登录。' : '请先登录后再尝试访问。' }}
+      </div>
       <div class="actions">
-        <el-button type="primary" @click="router.push(userStore.isLoggedIn ? '/' : '/login')">
+        <el-button type="primary" @click="handlePrimary">
           {{ userStore.isLoggedIn ? '返回首页' : '去登录' }}
         </el-button>
-        <el-button v-if="userStore.isLoggedIn" @click="userStore.logout().then(() => router.replace('/login'))">
+        <el-button v-if="userStore.isLoggedIn" @click="handleLogout">
           退出登录
         </el-button>
       </div>
@@ -61,6 +73,12 @@ p {
   margin: 0;
   color: #606266;
   line-height: 1.8;
+}
+
+.hint {
+  margin-top: 12px;
+  color: #6b7280;
+  line-height: 1.7;
 }
 
 .actions {

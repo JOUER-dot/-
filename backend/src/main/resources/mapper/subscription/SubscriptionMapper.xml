@@ -33,12 +33,20 @@
         where id = #{id}
     </update>
 
-    <select id="selectActiveSubscriptionsByUserId" resultType="com.finance.roboadvisor.subscription.vo.MySubscriptionItemVO">
+    <update id="updateStatusToCancelled">
+        update advisor_product_subscription
+        set status = 'CANCELLED',
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <select id="selectSubscriptionsByUserId" resultType="com.finance.roboadvisor.subscription.vo.MySubscriptionItemVO">
         select s.id as subscriptionId,
                p.id as productId,
                p.name as productName,
                p.type as type,
                p.risk_level as riskLevel,
+               p.status as productStatus,
                s.status as status,
                nav.nav as latestNav,
                nav.cum_return as latestCumReturn,
@@ -55,8 +63,6 @@
             ) latest on latest.product_id = n1.product_id and latest.max_nav_date = n1.nav_date
         ) nav on nav.product_id = p.id
         where s.user_id = #{userId}
-          and s.status = 'ACTIVE'
-          and p.status = 'PUBLISHED'
         order by s.created_at desc, s.id desc
     </select>
 </mapper>

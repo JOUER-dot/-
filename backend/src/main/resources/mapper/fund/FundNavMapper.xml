@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.fund.mapper.FundNavMapper">
+
+    <resultMap id="FundNavResultMap" type="com.finance.roboadvisor.fund.entity.FundNav">
+        <id property="id" column="id"/>
+        <result property="fundCode" column="fund_code"/>
+        <result property="fundName" column="fund_name"/>
+        <result property="navDate" column="nav_date"/>
+        <result property="nav" column="nav"/>
+        <result property="dailyReturn" column="daily_return"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="selectByFundCodes" resultMap="FundNavResultMap">
+        select id, fund_code, fund_name, nav_date, nav, daily_return, created_at
+        from fund_nav
+        where fund_code in
+        <foreach collection="fundCodes" item="fundCode" open="(" separator="," close=")">
+            #{fundCode}
+        </foreach>
+        order by fund_code asc, nav_date asc
+    </select>
+</mapper>

@@ -67,4 +67,50 @@ class SubscriptionServiceImplTest {
         verify(subscriptionMapper, never()).insert(org.mockito.ArgumentMatchers.any(AdvisorProductSubscription.class));
         verify(subscriptionMapper, never()).updateStatusToActive(100L);
     }
+
+    @Test
+    void unsubscribe_shouldUpdateStatusToCancelledWhenActive() {
+        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
+        subscription.setId(100L);
+        subscription.setProductId(1L);
+        subscription.setUserId(1L);
+        subscription.setStatus("ACTIVE");
+
+        when(subscriptionMapper.selectByUserIdAndProductId(1L, 1L)).thenReturn(subscription);
+
+        subscriptionService.unsubscribe(1L);
+
+        verify(subscriptionMapper).updateStatusToCancelled(100L);
+    }
+
+    @Test
+    void unsubscribe_shouldBeIdempotentWhenAlreadyCancelled() {
+        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
+        subscription.setId(100L);
+        subscription.setProductId(1L);
+        subscription.setUserId(1L);
+        subscription.setStatus("CANCELLED");
+
+        when(subscriptionMapper.selectByUserIdAndProductId(1L, 1L)).thenReturn(subscription);
+
+        subscriptionService.unsubscribe(1L);
+
+        verify(subscriptionMapper, never()).updateStatusToCancelled(100L);
+    }
+
+    @Test
+    void unsubscribe_shouldBeIdempotentWhenSubscriptionNotExists() {
+        when(subscriptionMapper.selectByUserIdAndProductId(1L, 1L)).thenReturn(null);
+
+        subscriptionService.unsubscribe(1L);
+
+        verify(subscriptionMapper, never()).updateStatusToCancelled(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void listMySubscriptions_shouldQueryAllSubscriptionsByUserId() {
+        subscriptionService.listMySubscriptions();
+
+        verify(subscriptionMapper).selectSubscriptionsByUserId(1L);
+    }
 }

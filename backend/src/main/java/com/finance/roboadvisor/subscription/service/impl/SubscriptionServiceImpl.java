@@ -17,6 +17,7 @@ import java.util.List;
 public class SubscriptionServiceImpl implements SubscriptionService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
+    private static final String STATUS_CANCELLED = "CANCELLED";
 
     private final SubscriptionMapper subscriptionMapper;
     private final PublicProductMapper publicProductMapper;
@@ -52,8 +53,22 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void unsubscribe(Long productId) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        AdvisorProductSubscription existing = subscriptionMapper.selectByUserIdAndProductId(userId, productId);
+        if (existing == null) {
+            return;
+        }
+        if (STATUS_CANCELLED.equals(existing.getStatus())) {
+            return;
+        }
+        subscriptionMapper.updateStatusToCancelled(existing.getId());
+    }
+
+    @Override
     public List<MySubscriptionItemVO> listMySubscriptions() {
         Long userId = SecurityUtil.getCurrentUserId();
-        return subscriptionMapper.selectActiveSubscriptionsByUserId(userId);
+        return subscriptionMapper.selectSubscriptionsByUserId(userId);
     }
 }

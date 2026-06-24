@@ -56,6 +56,8 @@ const handleLogin = async () => {
       </div>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="auth-form">
+        <div class="form-title">欢迎登录</div>
+        <div class="form-subtitle">请输入你的账号与密码继续</div>
         <el-form-item label="用户名" prop="username">
           <el-input v-model="form.username" placeholder="请输入用户名" />
         </el-form-item>
@@ -117,6 +119,18 @@ const handleLogin = async () => {
 
 .auth-form {
   padding: 48px;
+}
+
+.form-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.form-subtitle {
+  color: #6b7280;
+  margin-bottom: 20px;
 }
 
 .auth-button {

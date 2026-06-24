@@ -1,6 +1,7 @@
 package com.finance.roboadvisor.review.service;
 
 import com.finance.roboadvisor.common.api.PageResult;
+import com.finance.roboadvisor.review.dto.ReviewApproveDTO;
 import com.finance.roboadvisor.review.dto.ReviewRejectDTO;
 import com.finance.roboadvisor.review.vo.ReviewDetailVO;
 import com.finance.roboadvisor.review.vo.ReviewPendingListItemVO;
@@ -15,7 +16,7 @@ public interface ReviewService {
 
     ReviewDetailVO getPendingProductDetail(Long productId);
 
-    void approveProduct(Long productId);
+    void approveProduct(Long productId, ReviewApproveDTO dto);
 
     void rejectProduct(Long productId, ReviewRejectDTO dto);
 }

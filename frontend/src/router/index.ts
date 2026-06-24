@@ -1,13 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { defineComponent, h } from 'vue'
-import { useRoute } from 'vue-router'
-
-import { useUserStore } from '@/stores/user'
 import { setupRouterGuards } from '@/router/guards'
 
+import AppLayout from '@/layouts/AppLayout.vue'
 import Login from '@/views/auth/Login.vue'
 import Register from '@/views/auth/Register.vue'
 import Forbidden from '@/views/error/Forbidden.vue'
+import Dashboard from '@/views/common/Dashboard.vue'
+import AccountCenter from '@/views/account/AccountCenter.vue'
 import ProductList from '@/views/advisor/ProductList.vue'
 import ProductEdit from '@/views/advisor/ProductEdit.vue'
 import ReviewPendingList from '@/views/review/ReviewPendingList.vue'
@@ -16,146 +15,132 @@ import AdvisorZoneList from '@/views/public/AdvisorZoneList.vue'
 import AdvisorZoneDetail from '@/views/public/AdvisorZoneDetail.vue'
 import MySubscriptions from '@/views/public/MySubscriptions.vue'
 
-const HomeView = defineComponent({
-  name: 'HomeView',
-  setup() {
-    const userStore = useUserStore()
-    const route = useRoute()
-    const pageTitle = typeof route.meta.title === 'string' ? route.meta.title : '智能投顾平台'
-    const pageDesc =
-      typeof route.meta.description === 'string'
-        ? route.meta.description
-        : '当前页面用于验证登录态恢复、角色返回与退出登录；后续业务模块将继续复用这一统一路由和用户状态体系。'
-
-    return () =>
-      h('div', { style: 'min-height: 100vh; background: #f5f7fa; padding: 48px 24px;' }, [
-        h('div', {
-          style:
-            'max-width: 760px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(31, 35, 41, 0.08);'
-        }, [
-          h('h1', { style: 'margin: 0 0 12px; font-size: 28px; color: #303133;' }, pageTitle),
-          h(
-            'p',
-            { style: 'margin: 0 0 24px; color: #606266; line-height: 1.8;' },
-            pageDesc
-          ),
-          h('div', { style: 'display: grid; gap: 12px; color: #303133;' }, [
-            h('div', `当前用户：${userStore.userInfo?.nickname || userStore.userInfo?.username || '-'}`),
-            h('div', `用户名：${userStore.userInfo?.username || '-'}`),
-            h('div', `角色：${userStore.roles.join('、') || '-'}`)
-          ])
-        ])
-      ])
-  }
-})
-
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
-      name: 'Home',
-      component: HomeView,
-      meta: {
-        requiresAuth: true,
-        title: '智能投顾平台',
-        description: '当前页面用于验证统一登录态、角色信息和首页跳转逻辑。'
-      }
-    },
-    {
-      path: '/advisor-zone',
-      name: 'AdvisorZone',
-      component: AdvisorZoneList,
-      meta: {
-        title: '基金投顾产品专区',
-        description: '用户端产品专区列表页'
-      }
-    },
-    {
-      path: '/advisor-zone/:id',
-      name: 'AdvisorZoneDetail',
-      component: AdvisorZoneDetail,
-      meta: {
-        title: '产品详情',
-        description: '用户端产品详情页'
-      }
-    },
-    {
-      path: '/my-subscriptions',
-      name: 'MySubscriptions',
-      component: MySubscriptions,
-      meta: {
-        requiresAuth: true,
-        roles: ['USER'],
-        title: '我的订阅',
-        description: '用户端我的订阅页'
-      }
-    },
-    {
-      path: '/admin/products',
-      name: 'AdminProducts',
-      component: ProductList,
-      meta: {
-        requiresAuth: true,
-        roles: ['ADVISOR'],
-        title: '组合产品管理',
-        description: '投顾产品列表页'
-      }
-    },
-    {
-      path: '/admin/products/create',
-      name: 'AdvisorProductCreate',
-      component: ProductEdit,
-      meta: {
-        requiresAuth: true,
-        roles: ['ADVISOR'],
-        title: '创建产品',
-        description: '投顾创建产品草稿页'
-      }
-    },
-    {
-      path: '/admin/products/:id/edit',
-      name: 'AdvisorProductEdit',
-      component: ProductEdit,
-      meta: {
-        requiresAuth: true,
-        roles: ['ADVISOR'],
-        title: '编辑草稿',
-        description: '投顾编辑产品草稿页'
-      }
-    },
-    {
-      path: '/admin/products/:id',
-      name: 'AdvisorProductDetail',
-      component: ProductEdit,
-      meta: {
-        requiresAuth: true,
-        roles: ['ADVISOR'],
-        title: '产品详情',
-        description: '投顾查看产品详情页'
-      }
-    },
-    {
-      path: '/review/pending',
-      name: 'ReviewPending',
-      component: ReviewPendingList,
-      meta: {
-        requiresAuth: true,
-        roles: ['REVIEWER'],
-        title: '待审列表',
-        description: '审核员待审列表页'
-      }
-    },
-    {
-      path: '/review/pending/:id',
-      name: 'ReviewDetail',
-      component: ReviewDetail,
-      meta: {
-        requiresAuth: true,
-        roles: ['REVIEWER'],
-        title: '审核详情',
-        description: '审核员审核详情页'
-      }
+      component: AppLayout,
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          redirect: '/dashboard'
+        },
+        {
+          path: 'dashboard',
+          name: 'Dashboard',
+          component: Dashboard,
+          meta: { requiresAuth: true, title: '工作台' }
+        },
+        {
+          path: 'account',
+          name: 'AccountCenter',
+          component: AccountCenter,
+          meta: { requiresAuth: true, title: '账号中心' }
+        },
+        {
+          path: 'advisor-zone',
+          name: 'AdvisorZone',
+          component: AdvisorZoneList,
+          meta: {
+            title: '基金投顾产品专区',
+            description: '用户端产品专区列表页'
+          }
+        },
+        {
+          path: 'advisor-zone/:id',
+          name: 'AdvisorZoneDetail',
+          component: AdvisorZoneDetail,
+          meta: {
+            title: '产品详情',
+            description: '用户端产品详情页'
+          }
+        },
+        {
+          path: 'my-subscriptions',
+          name: 'MySubscriptions',
+          component: MySubscriptions,
+          meta: {
+            requiresAuth: true,
+            roles: ['USER'],
+            title: '我的订阅',
+            description: '用户端我的订阅页'
+          }
+        },
+        {
+          path: 'admin/products',
+          name: 'AdminProducts',
+          component: ProductList,
+          meta: {
+            requiresAuth: true,
+            roles: ['ADVISOR'],
+            title: '组合产品管理',
+            description: '投顾产品列表页'
+          }
+        },
+        {
+          path: 'admin/products/create',
+          name: 'AdvisorProductCreate',
+          component: ProductEdit,
+          meta: {
+            requiresAuth: true,
+            roles: ['ADVISOR'],
+            title: '创建产品',
+            description: '投顾创建产品草稿页'
+          }
+        },
+        {
+          path: 'admin/products/:id/edit',
+          name: 'AdvisorProductEdit',
+          component: ProductEdit,
+          meta: {
+            requiresAuth: true,
+            roles: ['ADVISOR'],
+            title: '编辑草稿',
+            description: '投顾编辑产品草稿页'
+          }
+        },
+        {
+          path: 'admin/products/:id',
+          name: 'AdvisorProductDetail',
+          component: ProductEdit,
+          meta: {
+            requiresAuth: true,
+            roles: ['ADVISOR'],
+            title: '产品详情',
+            description: '投顾查看产品详情页'
+          }
+        },
+        {
+          path: 'review/pending',
+          name: 'ReviewPending',
+          component: ReviewPendingList,
+          meta: {
+            requiresAuth: true,
+            roles: ['REVIEWER'],
+            title: '待审列表',
+            description: '审核员待审列表页'
+          }
+        },
+        {
+          path: 'review/pending/:id',
+          name: 'ReviewDetail',
+          component: ReviewDetail,
+          meta: {
+            requiresAuth: true,
+            roles: ['REVIEWER'],
+            title: '审核详情',
+            description: '审核员审核详情页'
+          }
+        },
+        {
+          path: '403',
+          name: 'Forbidden',
+          component: Forbidden,
+          meta: { title: '无权限' }
+        }
+      ]
     },
     {
       path: '/login',
@@ -168,11 +153,6 @@ const router = createRouter({
       name: 'Register',
       component: Register,
       meta: { guestOnly: true }
-    },
-    {
-      path: '/403',
-      name: 'Forbidden',
-      component: Forbidden
     }
   ]
 })

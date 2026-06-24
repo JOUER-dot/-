@@ -8,5 +8,7 @@ public interface SubscriptionService {
 
     void subscribe(Long productId);
 
+    void unsubscribe(Long productId);
+
     List<MySubscriptionItemVO> listMySubscriptions();
 }

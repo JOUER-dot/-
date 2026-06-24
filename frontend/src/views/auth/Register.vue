@@ -129,7 +129,7 @@ const handleRegister = async () => {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: #f5f7fa;
+  background: linear-gradient(135deg, #eef5ff 0%, #f7fbff 100%);
 }
 
 .register-card {
@@ -162,6 +162,10 @@ const handleRegister = async () => {
 }
 
 @media (max-width: 768px) {
+  .register-card {
+    padding: 24px;
+  }
+
   .button-row {
     flex-direction: column;
   }

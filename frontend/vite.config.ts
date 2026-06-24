@@ -9,6 +9,17 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src')
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          echarts: ['echarts'],
+          'element-plus': ['element-plus'],
+          vendor: ['vue', 'vue-router', 'pinia', 'axios']
+        }
+      }
+    }
+  },
   server: {
     port: 8080
   }

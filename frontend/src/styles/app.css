@@ -1,0 +1,135 @@
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f5f7fa;
+}
+
+.app-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-header h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  line-height: 30px;
+  color: #111827;
+}
+
+.page-header p {
+  margin: 0;
+  color: #606266;
+  line-height: 20px;
+}
+
+.section-card {
+  margin-bottom: 16px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.summary-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 18px 20px;
+}
+
+.summary-card__label {
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.summary-card__value {
+  margin-top: 10px;
+  color: #111827;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 700;
+}
+
+.summary-card__hint {
+  margin-top: 8px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 16px;
+}
+
+.content-grid__main,
+.content-grid__side {
+  min-width: 0;
+}
+
+.sticky-actions {
+  position: sticky;
+  top: 56px;
+  z-index: 10;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-radius: 18px;
+}
+
+.sticky-actions__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sticky-actions__title {
+  min-width: 0;
+}
+
+.sticky-actions__title strong {
+  display: block;
+  color: #111827;
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.sticky-actions__title span {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.sticky-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 960px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}

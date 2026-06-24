@@ -10,6 +10,7 @@ public class MySubscriptionItemVO {
     private String productName;
     private String type;
     private String riskLevel;
+    private String productStatus;
     private String status;
     private BigDecimal latestNav;
     private BigDecimal latestCumReturn;
@@ -53,6 +54,14 @@ public class MySubscriptionItemVO {
 
     public void setRiskLevel(String riskLevel) {
         this.riskLevel = riskLevel;
+    }
+
+    public String getProductStatus() {
+        return productStatus;
+    }
+
+    public void setProductStatus(String productStatus) {
+        this.productStatus = productStatus;
     }
 
     public String getStatus() {

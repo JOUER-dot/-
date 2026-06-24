@@ -17,5 +17,7 @@ public interface SubscriptionMapper {
 
     int updateStatusToActive(@Param("id") Long id);
 
-    List<MySubscriptionItemVO> selectActiveSubscriptionsByUserId(@Param("userId") Long userId);
+    int updateStatusToCancelled(@Param("id") Long id);
+
+    List<MySubscriptionItemVO> selectSubscriptionsByUserId(@Param("userId") Long userId);
 }

@@ -108,6 +108,10 @@ export function withdrawProduct(productId: number) {
   return request.post<void>(`/admin/products/${productId}/withdraw`)
 }
 
+export function offlineProduct(productId: number) {
+  return request.post<void>(`/admin/products/${productId}/offline`)
+}
+
 export function getProductReviews(productId: number) {
   return request.get<ReviewRecord[]>(`/admin/products/${productId}/reviews`)
 }

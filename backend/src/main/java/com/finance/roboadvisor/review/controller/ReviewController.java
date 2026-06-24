@@ -2,6 +2,7 @@ package com.finance.roboadvisor.review.controller;
 
 import com.finance.roboadvisor.common.api.ApiResult;
 import com.finance.roboadvisor.common.api.PageResult;
+import com.finance.roboadvisor.review.dto.ReviewApproveDTO;
 import com.finance.roboadvisor.review.dto.ReviewRejectDTO;
 import com.finance.roboadvisor.review.service.ReviewService;
 import com.finance.roboadvisor.review.vo.ReviewDetailVO;
@@ -41,8 +42,9 @@ public class ReviewController {
     }
 
     @PostMapping("/{id}/approve")
-    public ApiResult<Void> approveProduct(@PathVariable("id") Long productId) {
-        reviewService.approveProduct(productId);
+    public ApiResult<Void> approveProduct(@PathVariable("id") Long productId,
+                                          @RequestBody(required = false) ReviewApproveDTO dto) {
+        reviewService.approveProduct(productId, dto);
         return ApiResult.success("审核通过");
     }
 

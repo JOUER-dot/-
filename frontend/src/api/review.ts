@@ -2,6 +2,13 @@ import request from '@/utils/request'
 import type { PageResult } from '@/api/fund'
 import type { ProductComponentItem, ReviewRecord } from '@/api/product'
 
+export interface ReviewStrategyRule {
+  minFundCount?: number | null
+  maxFundCount?: number | null
+  minSingleWeight?: number | string | null
+  maxSingleWeight?: number | string | null
+}
+
 export interface ReviewPendingItem {
   id: number
   name: string
@@ -32,6 +39,15 @@ export interface ReviewDetail {
   params: Record<string, unknown>
   components: ProductComponentItem[]
   reviewSummary: ReviewRecord[]
+  strategyRule?: ReviewStrategyRule | null
+  baseRule?: ReviewStrategyRule | null
+}
+
+export interface ReviewApprovePayload {
+  overrideMinFundCount?: number
+  overrideMaxFundCount?: number
+  overrideMaxSingleWeight?: number
+  decisionComment?: string
 }
 
 export interface ReviewQueryParams {
@@ -54,8 +70,8 @@ export function getReviewDetail(productId: number) {
   return request.get<ReviewDetail>(`/reviewer/products/${productId}`)
 }
 
-export function approveReview(productId: number) {
-  return request.post<void>(`/reviewer/products/${productId}/approve`)
+export function approveReview(productId: number, payload?: ReviewApprovePayload) {
+  return request.post<void>(`/reviewer/products/${productId}/approve`, payload || {})
 }
 
 export function rejectReview(productId: number, payload: ReviewRejectPayload) {
