@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import PageHeader from '@/components/common/PageHeader.vue'
+import PageContainer from '@/components/ui/PageContainer.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import StatCard from '@/components/ui/StatCard.vue'
 import {
   approveReview,
   getReviewDetail,
@@ -76,24 +79,24 @@ const currentMaxSingleWeight = computed(() => {
 
 const summaryCards = computed(() => [
   {
-    label: '待审版本',
+    label: '版本',
     value: `V${detail.versionNo || '-'}`,
-    hint: detail.submittedAt || '等待提交时间'
+    hint: detail.submittedAt || ''
   },
   {
     label: '成份数量',
     value: String(componentCount.value),
-    hint: '用于校验策略成份门槛'
+    hint: ''
   },
   {
     label: '最大单基金权重',
     value: formatPercent(currentMaxSingleWeight.value),
-    hint: '用于校验单基金集中度'
+    hint: ''
   },
   {
     label: '产品状态',
     value: productStatusLabel(detail.status || '-'),
-    hint: '审核动作基于版本快照'
+    hint: ''
   }
 ])
 
@@ -196,8 +199,9 @@ void loadDetail()
 </script>
 
 <template>
-  <div v-loading="loading" class="app-page">
-    <PageHeader title="审核详情" description="当前页面展示待审版本快照，审核动作直接作用于提交审核时生成的版本。">
+  <PageContainer>
+  <div v-loading="loading" class="app-page review-page">
+    <PageHeader title="审核详情">
       <template #actions>
         <el-button @click="router.push('/review/pending')">返回待审列表</el-button>
         <el-button type="success" :loading="approving" @click="handleApprove">审核通过</el-button>
@@ -205,40 +209,36 @@ void loadDetail()
       </template>
     </PageHeader>
 
-    <div class="summary-grid">
-      <div v-for="item in summaryCards" :key="item.label" class="summary-card">
-        <div class="summary-card__label">{{ item.label }}</div>
-        <div class="summary-card__value">{{ item.value }}</div>
-        <div class="summary-card__hint">{{ item.hint }}</div>
-      </div>
+    <div class="stat-grid">
+      <StatCard
+        v-for="item in summaryCards"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-title">审核摘要</div>
-      </template>
+    <SectionCard title="审核摘要">
       <div class="check-list">
         <div v-for="item in ruleCheckItems" :key="item.label" class="check-card" :class="{ 'is-pass': item.ok, 'is-fail': !item.ok }">
           <div class="check-card__title">{{ item.label }}</div>
           <div class="check-card__result">{{ item.ok ? '符合要求' : '需要关注' }}</div>
           <div class="check-card__detail">{{ item.detail }}</div>
         </div>
-        <el-empty v-if="ruleCheckItems.length === 0" description="当前未配置可展示的规则校验摘要" />
+        <el-empty v-if="ruleCheckItems.length === 0" description="暂无规则校验结果" />
       </div>
-    </el-card>
+    </SectionCard>
 
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-title">基本信息</div>
-      </template>
+    <SectionCard title="基本信息">
       <el-descriptions :column="2" border>
         <el-descriptions-item label="产品名称">{{ detail.name }}</el-descriptions-item>
         <el-descriptions-item label="策略编码">{{ formatText(detail.strategyCode) }}</el-descriptions-item>
         <el-descriptions-item label="产品类型">{{ productTypeLabel(detail.type) }}</el-descriptions-item>
         <el-descriptions-item label="风险等级">{{ detail.riskLevel }}</el-descriptions-item>
-        <el-descriptions-item label="创建投顾">{{ formatText(detail.creatorName) }}</el-descriptions-item>
+        <el-descriptions-item label="创建人">{{ formatText(detail.creatorName) }}</el-descriptions-item>
         <el-descriptions-item label="产品状态">{{ productStatusLabel(detail.status) }}</el-descriptions-item>
-        <el-descriptions-item label="待审版本">V{{ detail.versionNo }}</el-descriptions-item>
+        <el-descriptions-item label="版本">V{{ detail.versionNo }}</el-descriptions-item>
         <el-descriptions-item label="版本状态">{{ reviewResultLabel(detail.versionStatus) }}</el-descriptions-item>
         <el-descriptions-item label="提交时间">{{ formatText(detail.submittedAt) }}</el-descriptions-item>
         <el-descriptions-item label="产品标签">
@@ -247,12 +247,9 @@ void loadDetail()
           </el-space>
         </el-descriptions-item>
       </el-descriptions>
-    </el-card>
+    </SectionCard>
 
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-title">基础信息快照</div>
-      </template>
+    <SectionCard title="基础信息">
       <el-descriptions :column="1" border>
         <el-descriptions-item label="产品简介">
           {{ formatText(detail.baseInfo.productSummary || detail.baseInfo.intro) }}
@@ -264,12 +261,9 @@ void loadDetail()
           {{ formatText(detail.baseInfo.riskTips) }}
         </el-descriptions-item>
       </el-descriptions>
-    </el-card>
+    </SectionCard>
 
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-title">策略参数快照</div>
-      </template>
+    <SectionCard title="策略参数">
       <el-descriptions :column="2" border>
         <el-descriptions-item label="调仓周期（天）">
           {{ formatText(detail.params.rebalanceCycleDays) }}
@@ -284,12 +278,9 @@ void loadDetail()
           {{ formatText(detail.params.investHorizonMonths) }}
         </el-descriptions-item>
       </el-descriptions>
-    </el-card>
+    </SectionCard>
 
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-title">基金成份快照</div>
-      </template>
+    <SectionCard title="基金成份">
       <el-table :data="detail.components" border>
         <el-table-column prop="fundCode" label="基金代码" min-width="120" />
         <el-table-column prop="fundName" label="基金名称" min-width="180" />
@@ -301,12 +292,9 @@ void loadDetail()
             </template>
           </el-table-column>
       </el-table>
-    </el-card>
+    </SectionCard>
 
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-title">规则覆盖</div>
-      </template>
+    <SectionCard title="规则覆盖">
       <div class="rule-block">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="默认最少成份数">
@@ -339,7 +327,6 @@ void loadDetail()
               step-strictly
               controls-position="right"
               class="rule-input"
-              placeholder="为空则沿用默认规则"
             />
           </el-form-item>
           <el-form-item label="覆盖最多成份数">
@@ -350,7 +337,6 @@ void loadDetail()
               step-strictly
               controls-position="right"
               class="rule-input"
-              placeholder="为空则沿用默认规则"
             />
           </el-form-item>
           <el-form-item label="覆盖最大单基金权重">
@@ -362,7 +348,6 @@ void loadDetail()
               :precision="4"
               controls-position="right"
               class="rule-input"
-              placeholder="为空则沿用默认规则"
             />
           </el-form-item>
         </div>
@@ -373,16 +358,13 @@ void loadDetail()
             :rows="3"
             maxlength="500"
             show-word-limit
-            placeholder="填写覆盖原因；无覆盖可留空"
+            placeholder="填写说明"
           />
         </el-form-item>
       </el-form>
-    </el-card>
+    </SectionCard>
 
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-title">历史审核记录</div>
-      </template>
+    <SectionCard title="历史审核记录">
       <el-empty v-if="detail.reviewSummary.length === 0" description="暂无审核记录" />
       <el-timeline v-else>
         <el-timeline-item
@@ -390,11 +372,11 @@ void loadDetail()
           :key="index"
           :timestamp="item.reviewedAt"
         >
-          <div class="review-title">{{ item.result }} / {{ item.reviewerName || '审核人' }}</div>
+          <div class="review-title">{{ reviewResultLabel(item.result) }} / {{ item.reviewerName || '审核人' }}</div>
           <div class="review-comment">{{ item.comment || '无审核意见' }}</div>
         </el-timeline-item>
       </el-timeline>
-    </el-card>
+    </SectionCard>
 
     <el-dialog v-model="rejectDialogVisible" title="审核驳回" width="560px">
       <el-form label-position="top">
@@ -405,7 +387,7 @@ void loadDetail()
             :rows="4"
             maxlength="500"
             show-word-limit
-            placeholder="请输入驳回原因"
+            placeholder="请输入内容"
           />
         </el-form-item>
       </el-form>
@@ -415,9 +397,22 @@ void loadDetail()
       </template>
     </el-dialog>
   </div>
+  </PageContainer>
 </template>
 
 <style scoped>
+.review-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
 .rule-block {
   margin-bottom: 16px;
 }
@@ -436,12 +431,6 @@ void loadDetail()
   width: 100%;
 }
 
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
 .check-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -450,23 +439,23 @@ void loadDetail()
 
 .check-card {
   padding: 16px;
-  border-radius: 16px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
 }
 
 .check-card.is-pass {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
+  background: rgba(18, 183, 106, 0.08);
+  border-color: rgba(18, 183, 106, 0.18);
 }
 
 .check-card.is-fail {
-  background: #fef2f2;
-  border-color: #fecaca;
+  background: rgba(217, 45, 32, 0.08);
+  border-color: rgba(217, 45, 32, 0.18);
 }
 
 .check-card__title {
-  color: #374151;
+  color: var(--color-text-2);
   font-size: 13px;
 }
 
@@ -474,23 +463,23 @@ void loadDetail()
   margin-top: 8px;
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text-1);
 }
 
 .check-card__detail {
   margin-top: 8px;
-  color: #6b7280;
+  color: var(--color-text-2);
   line-height: 20px;
 }
 
 .review-title {
   margin-bottom: 6px;
   font-weight: 600;
-  color: #303133;
+  color: var(--color-text-1);
 }
 
 .review-comment {
-  color: #606266;
+  color: var(--color-text-2);
   line-height: 1.7;
 }
 </style>

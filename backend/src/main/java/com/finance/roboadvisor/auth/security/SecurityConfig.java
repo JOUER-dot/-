@@ -59,6 +59,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/public/advisor-products/*/subscribe").hasRole("USER")
+                        .requestMatchers(HttpMethod.POST, "/api/public/advisor-products/*/unsubscribe").hasRole("USER")
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/auth/my-subscriptions").hasRole("USER")
                         .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()

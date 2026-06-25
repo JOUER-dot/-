@@ -2,7 +2,9 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import PageHeader from '@/components/common/PageHeader.vue'
+import PageContainer from '@/components/ui/PageContainer.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import StatCard from '@/components/ui/StatCard.vue'
 import { getPublishedProductList, type PublicProductListItem } from '@/api/public-product'
 import { formatDecimal, formatPercent, formatText } from '@/utils/format'
 import { loadPersisted, savePersisted } from '@/utils/persist'
@@ -37,21 +39,9 @@ const summaryCards = computed(() => {
   const highRiskCount = records.value.filter((item) => ['R4', 'R5'].includes(item.riskLevel)).length
   const navCount = records.value.filter((item) => item.latestNav !== undefined && item.latestNav !== null).length
   return [
-    {
-      label: '当前页产品数',
-      value: String(productCount),
-      hint: '仅展示已上架产品'
-    },
-    {
-      label: '高风险产品数',
-      value: String(highRiskCount),
-      hint: '风险等级为 R4 / R5'
-    },
-    {
-      label: '有净值数据产品',
-      value: String(navCount),
-      hint: '可查看收益曲线与净值表现'
-    }
+    { label: '当前页产品数', value: String(productCount), hint: '' },
+    { label: '高风险产品数', value: String(highRiskCount), hint: '' },
+    { label: '有净值数据产品', value: String(navCount), hint: '' }
   ]
 })
 
@@ -101,32 +91,35 @@ onMounted(() => {
 })
 
 watch(
-  () => ({
-    query: { ...queryForm },
-    pageSize: pager.pageSize
-  }),
+  () => ({ query: { ...queryForm }, pageSize: pager.pageSize }),
   (value) => savePersisted(storageKey, value),
   { deep: true }
 )
 </script>
 
 <template>
-  <div class="app-page">
-    <PageHeader title="基金投顾产品专区" description="专区仅展示已上架产品，详情基于已发布版本数据。">
-      <template #actions>
+  <PageContainer>
+    <div class="hero">
+      <div class="hero__left">
+        <div class="hero__kicker">产品专区</div>
+        <div class="hero__title">只展示已上架版本，浏览无需登录</div>
+      </div>
+      <div class="hero__right">
         <el-button @click="handleReset">重置筛选</el-button>
-      </template>
-    </PageHeader>
-
-    <div class="summary-grid">
-      <div v-for="item in summaryCards" :key="item.label" class="summary-card">
-        <div class="summary-card__label">{{ item.label }}</div>
-        <div class="summary-card__value">{{ item.value }}</div>
-        <div class="summary-card__hint">{{ item.hint }}</div>
       </div>
     </div>
 
-    <el-card shadow="never" class="quick-card">
+    <div class="stat-grid">
+      <StatCard
+        v-for="item in summaryCards"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
+    </div>
+
+    <SectionCard title="快捷筛选" subtitle="按产品类型快速过滤">
       <div class="quick-row">
         <div class="quick-label">产品类型</div>
         <el-space wrap>
@@ -142,17 +135,12 @@ watch(
           </el-button>
         </el-space>
       </div>
-    </el-card>
+    </SectionCard>
 
-    <el-card shadow="never" class="search-card">
+    <SectionCard title="筛选条件">
       <el-form :inline="true" :model="queryForm">
         <el-form-item label="关键字">
-          <el-input
-            v-model="queryForm.keyword"
-            clearable
-            placeholder="产品名称或策略编码"
-            @keyup.enter="handleSearch"
-          />
+          <el-input v-model="queryForm.keyword" clearable placeholder="产品名称或策略编码" @keyup.enter="handleSearch" />
         </el-form-item>
         <el-form-item label="产品类型">
           <el-select v-model="queryForm.type" clearable placeholder="全部">
@@ -169,17 +157,16 @@ watch(
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
-    </el-card>
+    </SectionCard>
 
-    <div v-loading="loading">
-      <el-empty v-if="records.length === 0" description="暂无符合条件的已上架产品" />
+    <div v-loading="loading" class="list-wrap">
+      <el-empty v-if="records.length === 0" description="暂无产品" />
       <el-row v-else :gutter="16">
         <el-col v-for="item in records" :key="item.id" :xs="24" :sm="12" :lg="8">
           <el-card shadow="hover" class="product-card" @click="router.push(`/advisor-zone/${item.id}`)">
             <div class="product-card__top">
               <div class="product-card__head">
                 <h3>{{ item.name }}</h3>
-                <p>面向已发布版本的公开展示与订阅入口</p>
               </div>
               <div class="product-card__tags">
                 <el-tag effect="dark">{{ item.riskLevel }}</el-tag>
@@ -202,34 +189,30 @@ watch(
               <el-tag v-for="tag in item.featureTags" :key="tag" effect="plain" size="small">
                 {{ tag }}
               </el-tag>
-              <span v-if="item.featureTags.length === 0" class="empty-text">暂无标签</span>
+              <span v-if="item.featureTags.length === 0" class="muted-text">暂无标签</span>
             </div>
 
             <div class="nav-summary">
               <div class="nav-block">
                 <span class="nav-label">最新净值</span>
                 <strong>{{ formatDecimal(item.latestNav) }}</strong>
-                <span class="nav-hint">用于展示最近一期组合净值</span>
               </div>
-              <div class="nav-block">
+              <div class="nav-block nav-block--positive">
                 <span class="nav-label">累计收益</span>
                 <strong>{{ formatPercent(item.latestCumReturn) }}</strong>
-                <span class="nav-hint">基于产品净值序列计算</span>
               </div>
             </div>
 
             <div class="product-card__footer">
-              <span class="footer-tip">支持查看收益、持仓和订阅信息</span>
-              <el-button type="primary" link @click.stop="router.push(`/advisor-zone/${item.id}`)">
-                查看详情
-              </el-button>
+              <span class="muted-text">{{ item.strategyCode ? formatText(item.strategyCode) : '' }}</span>
+              <el-button type="primary" link @click.stop="router.push(`/advisor-zone/${item.id}`)">查看详情</el-button>
             </div>
           </el-card>
         </el-col>
       </el-row>
     </div>
 
-    <el-card shadow="never" class="pager-card">
+    <SectionCard>
       <div class="pagination-bar">
         <el-pagination
           background
@@ -253,14 +236,45 @@ watch(
           "
         />
       </div>
-    </el-card>
-  </div>
+    </SectionCard>
+  </PageContainer>
 </template>
 
 <style scoped>
-.quick-card {
+.hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  background:
+    radial-gradient(680px 220px at 20% 20%, rgba(22, 59, 102, 0.12), transparent 60%),
+    radial-gradient(520px 240px at 90% 10%, rgba(15, 157, 138, 0.09), transparent 56%),
+    linear-gradient(180deg, var(--color-bg-card) 0%, #f8fafc 100%);
   margin-bottom: 16px;
-  border-radius: 18px;
+}
+
+.hero__kicker {
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  color: var(--color-text-2);
+}
+
+.hero__title {
+  margin-top: 10px;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 900;
+  color: var(--color-text-1);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .quick-row {
@@ -270,20 +284,20 @@ watch(
 }
 
 .quick-label {
-  font-weight: 600;
-  color: #111827;
+  font-weight: 700;
+  color: var(--color-text-1);
   white-space: nowrap;
 }
 
-.search-card,
-.pager-card {
-  margin-bottom: 16px;
+.list-wrap {
+  margin: 16px 0;
 }
 
 .product-card {
   margin-bottom: 16px;
   cursor: pointer;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
 }
 
 .product-card__top {
@@ -296,18 +310,8 @@ watch(
 
 .product-card__head h3 {
   margin: 0;
-  font-size: 20px;
-  color: #111827;
-}
-
-.product-card__head h3 {
-  margin: 0;
-}
-
-.product-card__head p {
-  margin: 8px 0 0;
-  color: #6b7280;
-  line-height: 20px;
+  font-size: 18px;
+  color: var(--color-text-1);
 }
 
 .product-card__tags {
@@ -326,18 +330,19 @@ watch(
 .meta-item {
   padding: 12px;
   background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 12px;
 }
 
 .meta-label {
   display: block;
   margin-bottom: 6px;
-  color: #6b7280;
+  color: var(--color-text-2);
   font-size: 12px;
 }
 
 .meta-item strong {
-  color: #111827;
+  color: var(--color-text-1);
 }
 
 .tag-list {
@@ -356,27 +361,26 @@ watch(
 
 .nav-block {
   padding: 14px;
-  background: linear-gradient(180deg, #eef6ff 0%, #f8fbff 100%);
   border-radius: 14px;
+  border: 1px solid rgba(22, 59, 102, 0.12);
+  background: linear-gradient(180deg, rgba(22, 59, 102, 0.08) 0%, rgba(255, 255, 255, 0.9) 100%);
+}
+
+.nav-block--positive {
+  border-color: rgba(15, 157, 138, 0.16);
+  background: linear-gradient(180deg, rgba(15, 157, 138, 0.1) 0%, rgba(255, 255, 255, 0.92) 100%);
+}
+
+.nav-label {
+  color: var(--color-text-2);
+  font-size: 13px;
 }
 
 .nav-summary strong {
   display: block;
   margin-top: 6px;
   font-size: 18px;
-  color: #303133;
-}
-
-.nav-label {
-  color: #909399;
-  font-size: 13px;
-}
-
-.nav-hint {
-  display: block;
-  margin-top: 6px;
-  color: #6b7280;
-  font-size: 12px;
+  color: var(--color-text-1);
 }
 
 .product-card__footer {
@@ -384,12 +388,6 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.footer-tip,
-.empty-text {
-  color: #6b7280;
-  font-size: 13px;
 }
 
 .pagination-bar {

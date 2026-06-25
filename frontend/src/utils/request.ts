@@ -1,6 +1,8 @@
 import axios, { type AxiosError, type AxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 
+import router from '@/router'
+import { normalizeApiBaseUrl } from '@/utils/api-base-url'
 import { emitAuthEvent } from '@/utils/auth-events'
 
 type ApiResponse<T> = {
@@ -32,7 +34,7 @@ function clearAuth() {
 }
 
 const service = axios.create({
-  baseURL: import.meta.env.VITE_APP_BASE_API,
+  baseURL: normalizeApiBaseUrl(import.meta.env.VITE_APP_BASE_API),
   timeout: 15000
 })
 
@@ -57,8 +59,7 @@ service.interceptors.response.use(
     }
     if (status === 403) {
       ElMessage.error('无权限访问')
-      clearAuth()
-      emitAuthEvent('logout', { reason: 'forbidden' })
+      void router.push('/403')
       return Promise.reject(error)
     }
     ElMessage.error(message)

@@ -78,5 +78,19 @@ const handleSelect = (index: string) => {
 .side-menu {
   height: 100%;
   border-right: none;
+  background: transparent;
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: rgba(255, 255, 255, 0.76);
+  --el-menu-hover-bg-color: rgba(255, 255, 255, 0.08);
+  --el-menu-active-color: #ffffff;
+}
+
+.side-menu :deep(.el-menu-item-group__title) {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.side-menu :deep(.el-menu-item.is-active) {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
 }
 </style>

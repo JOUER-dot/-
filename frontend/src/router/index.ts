@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { setupRouterGuards } from '@/router/guards'
 
 import AppLayout from '@/layouts/AppLayout.vue'
+import PublicLayout from '@/layouts/PublicLayout.vue'
 import Login from '@/views/auth/Login.vue'
 import Register from '@/views/auth/Register.vue'
 import Forbidden from '@/views/error/Forbidden.vue'
@@ -38,24 +39,6 @@ const router = createRouter({
           name: 'AccountCenter',
           component: AccountCenter,
           meta: { requiresAuth: true, title: '账号中心' }
-        },
-        {
-          path: 'advisor-zone',
-          name: 'AdvisorZone',
-          component: AdvisorZoneList,
-          meta: {
-            title: '基金投顾产品专区',
-            description: '用户端产品专区列表页'
-          }
-        },
-        {
-          path: 'advisor-zone/:id',
-          name: 'AdvisorZoneDetail',
-          component: AdvisorZoneDetail,
-          meta: {
-            title: '产品详情',
-            description: '用户端产品详情页'
-          }
         },
         {
           path: 'my-subscriptions',
@@ -133,14 +116,38 @@ const router = createRouter({
             title: '审核详情',
             description: '审核员审核详情页'
           }
-        },
-        {
-          path: '403',
-          name: 'Forbidden',
-          component: Forbidden,
-          meta: { title: '无权限' }
         }
       ]
+    },
+    {
+      path: '/advisor-zone',
+      component: PublicLayout,
+      children: [
+        {
+          path: '',
+          name: 'AdvisorZone',
+          component: AdvisorZoneList,
+          meta: {
+            title: '基金投顾产品专区',
+            description: '用户端产品专区列表页'
+          }
+        },
+        {
+          path: ':id',
+          name: 'AdvisorZoneDetail',
+          component: AdvisorZoneDetail,
+          meta: {
+            title: '产品详情',
+            description: '用户端产品详情页'
+          }
+        }
+      ]
+    },
+    {
+      path: '/403',
+      name: 'Forbidden',
+      component: Forbidden,
+      meta: { title: '无权限' }
     },
     {
       path: '/login',

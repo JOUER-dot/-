@@ -11,11 +11,23 @@ export function setupRouterGuards(router: Router) {
     const requiresAuth = Boolean(to.meta.requiresAuth)
     const guestOnly = Boolean(to.meta.guestOnly)
     const requiredRoles = (to.meta.roles as string[] | undefined) ?? []
-    const isDev = import.meta.env.DEV
     const isInitialNavigation = !from.name
 
-    if (isDev && isInitialNavigation && to.path === '/') {
-      return '/login'
+    if (isInitialNavigation && to.path === '/') {
+      if (userStore.token && !userStore.userInfo && !restoring) {
+        restoring = true
+        try {
+          await userStore.restoreSession()
+        } catch {
+          await userStore.logout(false)
+        } finally {
+          restoring = false
+        }
+      }
+      if (userStore.isLoggedIn) {
+        return getDefaultHomeByRoles(userStore.roles)
+      }
+      return '/advisor-zone'
     }
 
     if (userStore.token && !userStore.userInfo && !restoring) {
@@ -34,7 +46,7 @@ export function setupRouterGuards(router: Router) {
       }
     }
 
-    if (guestOnly && userStore.isLoggedIn && !isDev) {
+    if (guestOnly && userStore.isLoggedIn) {
       return getDefaultHomeByRoles(userStore.roles)
     }
 

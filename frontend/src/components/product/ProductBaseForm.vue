@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { productTypeOptions } from '@/utils/status'
+
 type ProductBaseModel = {
   name: string
   type: string
@@ -28,7 +30,7 @@ const formModel = computed({
   set: (value: ProductBaseModel) => emit('update:modelValue', value)
 })
 
-const typeOptions = ['稳健型', '平衡型', '进取型']
+const typeOptions = productTypeOptions()
 const riskOptions = ['R1', 'R2', 'R3', 'R4', 'R5']
 const featureTagOptions = ['固收增强', '权益增强', '低波动', '长期持有', '养老规划', '现金管理']
 </script>
@@ -49,7 +51,7 @@ const featureTagOptions = ['固收增强', '权益增强', '低波动', '长期�
         <el-col :span="12">
           <el-form-item label="产品类型" required>
             <el-select v-model="formModel.type" :disabled="readOnly" placeholder="请选择产品类型">
-              <el-option v-for="item in typeOptions" :key="item" :label="item" :value="item" />
+              <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
         </el-col>

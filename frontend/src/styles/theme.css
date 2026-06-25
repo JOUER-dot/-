@@ -1,0 +1,32 @@
+:root {
+  --el-color-primary: var(--color-primary);
+  --el-color-success: var(--color-success);
+  --el-color-warning: var(--color-warning);
+  --el-color-danger: var(--color-danger);
+
+  --el-border-color: var(--color-border);
+  --el-border-color-light: var(--color-border);
+
+  --el-text-color-primary: var(--color-text-1);
+  --el-text-color-regular: var(--color-text-2);
+  --el-text-color-secondary: var(--color-text-3);
+
+  --el-border-radius-base: var(--radius-btn);
+  --el-box-shadow: var(--shadow-soft);
+  --el-box-shadow-light: var(--shadow-soft);
+  --el-box-shadow-lighter: var(--shadow-soft);
+}
+
+body {
+  background: var(--color-bg-page);
+  color: var(--color-text-1);
+}
+
+.section-card {
+  border-radius: var(--radius-card);
+  box-shadow: none;
+}
+
+.muted-text {
+  color: var(--color-text-3);
+}

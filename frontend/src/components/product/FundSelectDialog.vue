@@ -223,7 +223,6 @@ watch(
     </el-table>
 
     <div class="footer-bar">
-      <div class="footer-tip">仅展示启用状态基金，可多选后一次性加入组合。</div>
       <el-pagination
         background
         layout="total, sizes, prev, pager, next"
@@ -280,13 +279,8 @@ watch(
   margin-top: 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
-}
-
-.footer-tip {
-  color: #909399;
-  font-size: 13px;
 }
 
 .dialog-footer {

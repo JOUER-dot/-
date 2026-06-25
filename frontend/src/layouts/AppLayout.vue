@@ -24,12 +24,12 @@ import TopBar from '@/components/nav/TopBar.vue'
 <style scoped>
 .app-shell {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--color-bg-page);
 }
 
 .app-aside {
-  background: #ffffff;
-  border-right: 1px solid #ebeef5;
+  background: linear-gradient(180deg, #0f2a45 0%, #0b1f33 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   overflow: auto;
@@ -42,8 +42,8 @@ import TopBar from '@/components/nav/TopBar.vue'
   padding: 0 16px;
   font-size: 18px;
   font-weight: 700;
-  color: #303133;
-  border-bottom: 1px solid #ebeef5;
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .app-header {

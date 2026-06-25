@@ -3,17 +3,14 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import PageHeader from '@/components/common/PageHeader.vue'
+import PageContainer from '@/components/ui/PageContainer.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import StatCard from '@/components/ui/StatCard.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
 import { getMySubscriptions, type MySubscriptionItem, unsubscribeProduct } from '@/api/subscription'
 import { formatDecimal, formatPercent } from '@/utils/format'
 import { loadPersisted, savePersisted } from '@/utils/persist'
-import {
-  productStatusLabel,
-  productStatusTagType,
-  productTypeLabel,
-  subscriptionStatusLabel,
-  subscriptionStatusTagType
-} from '@/utils/status'
+import { productTypeLabel } from '@/utils/status'
 
 const router = useRouter()
 const loading = ref(false)
@@ -49,10 +46,10 @@ const summaryCards = computed(() => {
   const cancelledCount = source.filter((item) => item.status === 'CANCELLED').length
   const offlineCount = source.filter((item) => item.productStatus === 'OFFLINE').length
   return [
-    { label: '筛选后记录数', value: String(source.length), hint: '按当前筛选条件统计' },
-    { label: '当前有效订阅', value: String(activeCount), hint: '仍处于 ACTIVE 的记录' },
-    { label: '已取消订阅', value: String(cancelledCount), hint: '用户主动取消的记录' },
-    { label: '产品已下架', value: String(offlineCount), hint: '产品状态为 OFFLINE' }
+    { label: '订阅记录', value: String(source.length), hint: '' },
+    { label: '有效订阅', value: String(activeCount), hint: '' },
+    { label: '已取消', value: String(cancelledCount), hint: '' },
+    { label: '已下架产品', value: String(offlineCount), hint: '' }
   ]
 })
 
@@ -96,104 +93,118 @@ const handleUnsubscribe = async (row: MySubscriptionItem) => {
 </script>
 
 <template>
-  <div class="app-page">
-    <PageHeader title="我的订阅" description="这里展示当前用户的全部订阅记录，并区分产品状态与订阅状态。" />
-
-    <div class="summary-grid">
-      <div v-for="item in summaryCards" :key="item.label" class="summary-card">
-        <div class="summary-card__label">{{ item.label }}</div>
-        <div class="summary-card__value">{{ item.value }}</div>
-        <div class="summary-card__hint">{{ item.hint }}</div>
-      </div>
-    </div>
-
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="table-header">
-          <div class="section-title">订阅明细</div>
-          <div class="filter-row">
-            <el-input
-              v-model="filterForm.keyword"
-              clearable
-              placeholder="按产品名称筛选"
-              class="filter-input"
-            />
-            <el-select v-model="filterForm.subscriptionStatus" clearable placeholder="订阅状态" class="filter-select">
-              <el-option label="已订阅" value="ACTIVE" />
-              <el-option label="已取消" value="CANCELLED" />
-            </el-select>
-            <el-select v-model="filterForm.productStatus" clearable placeholder="产品状态" class="filter-select">
-              <el-option label="已上架" value="PUBLISHED" />
-              <el-option label="已下架" value="OFFLINE" />
-            </el-select>
-            <el-button @click="handleClearFilters">清空筛选</el-button>
-          </div>
+  <PageContainer>
+    <div class="subscription-page">
+      <div class="hero">
+        <div>
+          <div class="hero__kicker">我的订阅</div>
+          <div class="hero__title">跟踪已订阅产品</div>
         </div>
-      </template>
-      <el-empty v-if="!loading && filteredRecords.length === 0" description="暂无符合条件的订阅记录" />
-      <el-table v-else v-loading="loading" :data="filteredRecords" border>
-        <el-table-column prop="productName" label="产品名称" min-width="180" />
-        <el-table-column prop="type" label="产品类型" width="110">
-          <template #default="{ row }">
-            {{ productTypeLabel(row.type) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="riskLevel" label="风险等级" width="100" />
-        <el-table-column label="产品状态" width="120">
-          <template #default="{ row }">
-            <el-tag :type="productStatusTagType(row.productStatus)">
-              {{ productStatusLabel(row.productStatus) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="订阅状态" width="120">
-          <template #default="{ row }">
-            <el-tag :type="subscriptionStatusTagType(row.status)">
-              {{ subscriptionStatusLabel(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="最新净值" width="120">
-          <template #default="{ row }">
-            {{ formatDecimal(row.latestNav) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="累计收益" width="120">
-          <template #default="{ row }">
-            {{ formatPercent(row.latestCumReturn) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="subscribedAt" label="订阅时间" min-width="180" />
-        <el-table-column label="操作" width="180" fixed="right">
-          <template #default="{ row }">
-            <el-space>
-              <el-button link type="primary" @click="router.push(`/advisor-zone/${row.productId}`)">
-                查看详情
-              </el-button>
-              <el-button v-if="row.status === 'ACTIVE'" link type="danger" @click="handleUnsubscribe(row)">
-                取消订阅
-              </el-button>
-            </el-space>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-  </div>
+      </div>
+
+      <div class="stat-grid">
+        <StatCard v-for="item in summaryCards" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      </div>
+
+      <SectionCard title="筛选">
+        <div class="filter-row">
+          <el-input v-model="filterForm.keyword" clearable placeholder="产品名称" class="filter-input" />
+          <el-select v-model="filterForm.subscriptionStatus" clearable placeholder="订阅状态" class="filter-select">
+            <el-option label="已订阅" value="ACTIVE" />
+            <el-option label="已取消" value="CANCELLED" />
+          </el-select>
+          <el-select v-model="filterForm.productStatus" clearable placeholder="产品状态" class="filter-select">
+            <el-option label="已上架" value="PUBLISHED" />
+            <el-option label="已下架" value="OFFLINE" />
+          </el-select>
+          <el-button @click="handleClearFilters">清空</el-button>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="订阅列表">
+        <el-empty v-if="!loading && filteredRecords.length === 0" description="暂无订阅记录" />
+        <el-table v-else v-loading="loading" :data="filteredRecords" border>
+          <el-table-column prop="productName" label="产品名称" min-width="180" />
+          <el-table-column prop="type" label="产品类型" width="110">
+            <template #default="{ row }">
+              {{ productTypeLabel(row.type) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="riskLevel" label="风险等级" width="100" />
+          <el-table-column label="产品状态" width="120">
+            <template #default="{ row }">
+              <StatusTag kind="product" :value="row.productStatus" />
+            </template>
+          </el-table-column>
+          <el-table-column label="订阅状态" width="120">
+            <template #default="{ row }">
+              <StatusTag kind="subscription" :value="row.status" />
+            </template>
+          </el-table-column>
+          <el-table-column label="最新净值" width="120">
+            <template #default="{ row }">
+              {{ formatDecimal(row.latestNav) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="累计收益" width="120">
+            <template #default="{ row }">
+              {{ formatPercent(row.latestCumReturn) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="subscribedAt" label="订阅时间" min-width="180" />
+          <el-table-column label="操作" width="180" fixed="right">
+            <template #default="{ row }">
+              <el-space>
+                <el-button link type="primary" @click="router.push(`/advisor-zone/${row.productId}`)">查看详情</el-button>
+                <el-button v-if="row.status === 'ACTIVE'" link type="danger" @click="handleUnsubscribe(row)">取消订阅</el-button>
+              </el-space>
+            </template>
+          </el-table-column>
+        </el-table>
+      </SectionCard>
+    </div>
+  </PageContainer>
 </template>
 
 <style scoped>
-.table-header {
+.subscription-page {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hero {
+  padding: 18px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  background:
+    radial-gradient(640px 220px at 18% 18%, rgba(22, 59, 102, 0.12), transparent 60%),
+    linear-gradient(180deg, var(--color-bg-card) 0%, #f8fafc 100%);
+}
+
+.hero__kicker {
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.hero__title {
+  margin-top: 10px;
+  font-size: 26px;
+  line-height: 34px;
+  font-weight: 900;
+  color: var(--color-text-1);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
 }
 
 .filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  justify-content: flex-end;
 }
 
 .filter-input {
@@ -204,9 +215,4 @@ const handleUnsubscribe = async (row: MySubscriptionItem) => {
   width: 140px;
 }
 
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
 </style>
