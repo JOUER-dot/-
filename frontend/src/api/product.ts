@@ -2,6 +2,7 @@ import request from '@/utils/request'
 import type { FundOption, PageResult } from '@/api/fund'
 
 export type ProductStatus = 'DRAFT' | 'PENDING_REVIEW' | 'REJECTED' | 'PUBLISHED' | 'OFFLINE'
+export type ProductChangeType = 'NORMAL' | 'MAJOR'
 
 export interface ProductComponentItem {
   fundId: number
@@ -84,6 +85,11 @@ export interface ProductCreateResponse {
   productId: number
 }
 
+export interface ProductSubmitPayload {
+  changeType?: ProductChangeType
+  versionNote?: string
+}
+
 export function createProduct(payload: ProductSavePayload) {
   return request.post<ProductCreateResponse>('/admin/products', payload)
 }
@@ -100,8 +106,8 @@ export function getProductDetail(productId: number) {
   return request.get<ProductDetail>(`/admin/products/${productId}`)
 }
 
-export function submitProduct(productId: number) {
-  return request.post<void>(`/admin/products/${productId}/submit`)
+export function submitProduct(productId: number, payload?: ProductSubmitPayload) {
+  return request.post<void>(`/admin/products/${productId}/submit`, payload || {})
 }
 
 export function withdrawProduct(productId: number) {
@@ -114,6 +120,20 @@ export function offlineProduct(productId: number) {
 
 export function getProductReviews(productId: number) {
   return request.get<ReviewRecord[]>(`/admin/products/${productId}/reviews`)
+}
+
+export function deleteProduct(productId: number) {
+  return request.delete<void>(`/admin/products/${productId}`)
+}
+
+export function copyProduct(productId: number) {
+  return request.post<number>(`/admin/products/${productId}/copy`)
+}
+
+export function getProductFlowLogs(productId: number) {
+  return request.get<Array<{ id: number; actionType: string; comment: string; operatorId: number; createdAt: string }>>(
+    `/admin/products/${productId}/flow-logs`
+  )
 }
 
 export function mapFundToComponent(fund: FundOption): ProductComponentItem {

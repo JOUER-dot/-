@@ -103,9 +103,18 @@ request.put = function <T>(url: string, data?: unknown, config?: AxiosRequestCon
   })
 }
 
+request.delete = function <T>(url: string, config?: AxiosRequestConfig) {
+  return request<T>({
+    ...config,
+    method: 'DELETE',
+    url
+  })
+}
+
 export default request as typeof request & {
   get: <T>(url: string, config?: AxiosRequestConfig) => Promise<T>
   post: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) => Promise<T>
   put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) => Promise<T>
+  delete: <T>(url: string, config?: AxiosRequestConfig) => Promise<T>
 }
 export { AUTH_STORAGE_KEY }

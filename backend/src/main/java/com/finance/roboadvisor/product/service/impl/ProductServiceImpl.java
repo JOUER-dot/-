@@ -2,14 +2,20 @@ package com.finance.roboadvisor.product.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finance.roboadvisor.auth.entity.SysRole;
+import com.finance.roboadvisor.auth.entity.SysUserRole;
+import com.finance.roboadvisor.auth.mapper.RoleMapper;
+import com.finance.roboadvisor.auth.mapper.UserRoleMapper;
 import com.finance.roboadvisor.common.api.PageResult;
 import com.finance.roboadvisor.common.api.ResultCode;
 import com.finance.roboadvisor.common.exception.BusinessException;
 import com.finance.roboadvisor.common.util.SecurityUtil;
 import com.finance.roboadvisor.fund.mapper.FundMapper;
 import com.finance.roboadvisor.fund.vo.FundOptionVO;
+import com.finance.roboadvisor.notification.service.NotificationService;
 import com.finance.roboadvisor.product.dto.ComponentItemDTO;
 import com.finance.roboadvisor.product.dto.ProductSaveDTO;
+import com.finance.roboadvisor.product.dto.ProductSubmitDTO;
 import com.finance.roboadvisor.product.entity.AdvisorProduct;
 import com.finance.roboadvisor.product.entity.AdvisorProductComponent;
 import com.finance.roboadvisor.product.entity.AdvisorProductDraft;
@@ -21,6 +27,7 @@ import com.finance.roboadvisor.product.mapper.ProductDraftComponentMapper;
 import com.finance.roboadvisor.product.mapper.ProductDraftMapper;
 import com.finance.roboadvisor.product.mapper.ProductFlowLogMapper;
 import com.finance.roboadvisor.product.mapper.ProductMapper;
+import com.finance.roboadvisor.product.mapper.ProductNavMapper;
 import com.finance.roboadvisor.product.mapper.ProductReviewMapper;
 import com.finance.roboadvisor.product.mapper.ProductVersionMapper;
 import com.finance.roboadvisor.product.service.ProductHoldingSnapshotGenerationService;
@@ -33,6 +40,8 @@ import com.finance.roboadvisor.product.vo.ProductDetailVO;
 import com.finance.roboadvisor.product.vo.ProductListItemVO;
 import com.finance.roboadvisor.product.vo.PublishedVersionVO;
 import com.finance.roboadvisor.product.vo.ReviewRecordVO;
+import com.finance.roboadvisor.subscription.entity.AdvisorProductSubscription;
+import com.finance.roboadvisor.subscription.mapper.SubscriptionMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -55,11 +64,15 @@ public class ProductServiceImpl implements ProductService {
     private static final String STATUS_PUBLISHED = "PUBLISHED";
     private static final String STATUS_OFFLINE = "OFFLINE";
     private static final String STATUS_REJECTED = "REJECTED";
+    private static final String CHANGE_NORMAL = "NORMAL";
+    private static final String CHANGE_MAJOR = "MAJOR";
     private static final String VERSION_SUBMITTED = "SUBMITTED";
     private static final String VERSION_WITHDRAWN = "WITHDRAWN";
     private static final String FLOW_SAVE_DRAFT = "SAVE_DRAFT";
     private static final String FLOW_SUBMIT = "SUBMIT";
     private static final String FLOW_WITHDRAW = "WITHDRAW";
+    private static final String FLOW_DELETE = "DELETE";
+    private static final String FLOW_COPY = "COPY";
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 10;
 
@@ -70,10 +83,15 @@ public class ProductServiceImpl implements ProductService {
     private final ProductComponentMapper productComponentMapper;
     private final ProductReviewMapper productReviewMapper;
     private final ProductFlowLogMapper productFlowLogMapper;
+    private final ProductNavMapper productNavMapper;
     private final FundMapper fundMapper;
     private final ProductNavGenerationService productNavGenerationService;
     private final ProductHoldingSnapshotGenerationService productHoldingSnapshotGenerationService;
     private final StrategyRuleValidationService strategyRuleValidationService;
+    private final SubscriptionMapper subscriptionMapper;
+    private final NotificationService notificationService;
+    private final UserRoleMapper userRoleMapper;
+    private final RoleMapper roleMapper;
     private final ObjectMapper objectMapper;
 
     public ProductServiceImpl(ProductMapper productMapper,
@@ -83,10 +101,15 @@ public class ProductServiceImpl implements ProductService {
                               ProductComponentMapper productComponentMapper,
                               ProductReviewMapper productReviewMapper,
                               ProductFlowLogMapper productFlowLogMapper,
+                              ProductNavMapper productNavMapper,
                               FundMapper fundMapper,
                               ProductNavGenerationService productNavGenerationService,
                               ProductHoldingSnapshotGenerationService productHoldingSnapshotGenerationService,
                               StrategyRuleValidationService strategyRuleValidationService,
+                              SubscriptionMapper subscriptionMapper,
+                              NotificationService notificationService,
+                              UserRoleMapper userRoleMapper,
+                              RoleMapper roleMapper,
                               ObjectMapper objectMapper) {
         this.productMapper = productMapper;
         this.productDraftMapper = productDraftMapper;
@@ -95,10 +118,15 @@ public class ProductServiceImpl implements ProductService {
         this.productComponentMapper = productComponentMapper;
         this.productReviewMapper = productReviewMapper;
         this.productFlowLogMapper = productFlowLogMapper;
+        this.productNavMapper = productNavMapper;
         this.fundMapper = fundMapper;
         this.productNavGenerationService = productNavGenerationService;
         this.productHoldingSnapshotGenerationService = productHoldingSnapshotGenerationService;
         this.strategyRuleValidationService = strategyRuleValidationService;
+        this.subscriptionMapper = subscriptionMapper;
+        this.notificationService = notificationService;
+        this.userRoleMapper = userRoleMapper;
+        this.roleMapper = roleMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -137,7 +165,9 @@ public class ProductServiceImpl implements ProductService {
     public void updateProduct(Long productId, ProductSaveDTO dto) {
         Long currentUserId = SecurityUtil.getCurrentUserId();
         AdvisorProduct product = getOwnedProduct(productId, currentUserId);
-        if (!STATUS_DRAFT.equals(product.getStatus()) && !STATUS_REJECTED.equals(product.getStatus())) {
+        if (!STATUS_DRAFT.equals(product.getStatus())
+                && !STATUS_REJECTED.equals(product.getStatus())
+                && !STATUS_PUBLISHED.equals(product.getStatus())) {
             throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "当前状态不允许编辑草稿");
         }
 
@@ -243,11 +273,19 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void submitProduct(Long productId) {
+    public void submitProduct(Long productId, ProductSubmitDTO dto) {
         Long currentUserId = SecurityUtil.getCurrentUserId();
         AdvisorProduct product = getOwnedProduct(productId, currentUserId);
-        if (!STATUS_DRAFT.equals(product.getStatus()) && !STATUS_REJECTED.equals(product.getStatus())) {
+        if (!STATUS_DRAFT.equals(product.getStatus())
+                && !STATUS_REJECTED.equals(product.getStatus())
+                && !STATUS_PUBLISHED.equals(product.getStatus())) {
             throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "当前状态不允许提交审核");
+        }
+        if (STATUS_PUBLISHED.equals(product.getStatus())) {
+            AdvisorProductVersion inFlightVersion = productVersionMapper.selectLatestDraftOrSubmittedByProductId(productId);
+            if (inFlightVersion != null) {
+                throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "当前产品已有未完成版本");
+            }
         }
 
         AdvisorProductDraft draft = productDraftMapper.selectByProductId(productId);
@@ -282,6 +320,10 @@ public class ProductServiceImpl implements ProductService {
         version.setBaseInfoJson(writeJson(buildVersionBaseInfo(product, readMap(draft.getBaseInfoJson()))));
         version.setParamsJson(draft.getParamsJson());
         version.setVersionStatus(VERSION_SUBMITTED);
+        version.setChangeType(normalizeChangeType(dto == null ? null : dto.getChangeType()));
+        AdvisorProductVersion baseVersion = productVersionMapper.selectLatestPublishedByProductId(productId);
+        version.setBaseVersionId(baseVersion == null ? null : baseVersion.getId());
+        version.setVersionNote(trimToNull(dto == null ? null : dto.getVersionNote()));
         version.setStatusAtSubmit(product.getStatus());
         version.setSubmittedAt(java.time.LocalDateTime.now());
         productVersionMapper.insert(version);
@@ -299,6 +341,22 @@ public class ProductServiceImpl implements ProductService {
         productComponentMapper.batchInsert(versionComponents);
         productMapper.updateStatusAndVersion(productId, STATUS_PENDING_REVIEW, version.getVersionNo());
         insertFlowLog(productId, version.getId(), currentUserId, FLOW_SUBMIT, "提交审核");
+
+        // Notify all reviewers
+        try {
+            SysRole reviewerRole = roleMapper.selectByRoleCode("REVIEWER");
+            if (reviewerRole != null) {
+                List<SysUserRole> reviewerRelations = userRoleMapper.selectByRoleId(reviewerRole.getId());
+                for (SysUserRole rel : reviewerRelations) {
+                    notificationService.createNotification(rel.getUserId(),
+                            "新待审产品",
+                            "投顾提交了产品「" + product.getName() + "」，请前往审核。",
+                            "REVIEW_RESULT",
+                            "/review/pending/" + productId);
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -347,6 +405,106 @@ public class ProductServiceImpl implements ProductService {
         Long currentUserId = SecurityUtil.getCurrentUserId();
         getOwnedProduct(productId, currentUserId);
         return productReviewMapper.selectByProductId(productId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteProduct(Long productId) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        AdvisorProduct product = getOwnedProduct(productId, currentUserId);
+
+        // Only DRAFT, REJECTED, OFFLINE can be deleted
+        if (STATUS_PENDING_REVIEW.equals(product.getStatus()) || STATUS_PUBLISHED.equals(product.getStatus())) {
+            throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "待审核或已上架产品无法删除，请先撤回或下架");
+        }
+
+        // Check no active subscriptions
+        List<AdvisorProductSubscription> activeSubs =
+                subscriptionMapper.selectActiveSubscriptionsByProductId(productId);
+        if (!activeSubs.isEmpty()) {
+            throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "存在有效订阅，无法删除");
+        }
+
+        // Cascade delete: versions → version components
+        List<AdvisorProductVersion> versions = productVersionMapper.selectByProductId(productId);
+        for (AdvisorProductVersion version : versions) {
+            productNavMapper.deleteByProductId(productId);
+            // version components deleted via cascade
+        }
+        productVersionMapper.deleteByProductId(productId);
+
+        // Delete reviews
+        productReviewMapper.deleteByProductId(productId);
+
+        // Delete draft & draft components
+        AdvisorProductDraft draft = productDraftMapper.selectByProductId(productId);
+        if (draft != null) {
+            productDraftComponentMapper.deleteByDraftId(draft.getId());
+        }
+        productDraftMapper.deleteByProductId(productId);
+
+        // Delete flow logs
+        productFlowLogMapper.deleteByProductId(productId);
+
+        // Delete product itself
+        productMapper.deleteById(productId);
+
+        insertFlowLog(productId, null, currentUserId, FLOW_DELETE, "删除产品");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long copyProduct(Long productId) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        AdvisorProduct source = getOwnedProduct(productId, currentUserId);
+
+        // Create new product with "(副本)" suffix
+        AdvisorProduct product = new AdvisorProduct();
+        product.setName(source.getName() + "(副本)");
+        product.setType(source.getType());
+        product.setRiskLevel(source.getRiskLevel());
+        product.setStrategyCode(source.getStrategyCode());
+        product.setFeatureTags(source.getFeatureTags());
+        product.setStatus(STATUS_DRAFT);
+        product.setCreatorId(currentUserId);
+        product.setCurrentVersionNo(0);
+        productMapper.insert(product);
+
+        // Copy draft
+        AdvisorProductDraft sourceDraft = productDraftMapper.selectByProductId(productId);
+        if (sourceDraft != null) {
+            AdvisorProductDraft draft = new AdvisorProductDraft();
+            draft.setProductId(product.getId());
+            draft.setBaseInfoJson(sourceDraft.getBaseInfoJson());
+            draft.setParamsJson(sourceDraft.getParamsJson());
+            draft.setUpdatedBy(currentUserId);
+            productDraftMapper.insert(draft);
+
+            // Copy draft components
+            List<DraftComponentVO> components = productDraftComponentMapper.selectByDraftId(sourceDraft.getId());
+            if (components != null && !components.isEmpty()) {
+                List<AdvisorProductDraftComponent> items = new ArrayList<>();
+                for (DraftComponentVO comp : components) {
+                    AdvisorProductDraftComponent item = new AdvisorProductDraftComponent();
+                    item.setDraftId(draft.getId());
+                    item.setFundId(comp.getFundId());
+                    item.setWeight(comp.getWeight());
+                    items.add(item);
+                }
+                productDraftComponentMapper.batchInsert(items);
+            }
+        }
+
+        insertFlowLog(product.getId(), null, currentUserId, FLOW_COPY,
+                "从产品 " + source.getName() + "(ID:" + source.getId() + ") 复制创建");
+        return product.getId();
+    }
+
+    @Override
+    public List<AdvisorProductFlowLog> listFlowLogs(Long productId) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        getOwnedProduct(productId, currentUserId);
+        return productFlowLogMapper.selectByProductId(productId);
     }
 
     private AdvisorProduct getOwnedProduct(Long productId, Long currentUserId) {
@@ -492,5 +650,16 @@ public class ProductServiceImpl implements ProductService {
 
     private String trimToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String normalizeChangeType(String changeType) {
+        String normalized = trimToNull(changeType);
+        if (normalized == null) {
+            return CHANGE_NORMAL;
+        }
+        if (CHANGE_MAJOR.equalsIgnoreCase(normalized)) {
+            return CHANGE_MAJOR;
+        }
+        return CHANGE_NORMAL;
     }
 }

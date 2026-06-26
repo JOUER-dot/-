@@ -1,7 +1,11 @@
 package com.finance.roboadvisor.subscription.vo;
 
+import com.finance.roboadvisor.subscription.entity.SubscriptionVersionAction;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MySubscriptionItemVO {
 
@@ -15,6 +19,7 @@ public class MySubscriptionItemVO {
     private BigDecimal latestNav;
     private BigDecimal latestCumReturn;
     private LocalDateTime subscribedAt;
+    private List<SubscriptionVersionAction> pendingVersionActions = new ArrayList<>();
 
     public Long getSubscriptionId() {
         return subscriptionId;
@@ -94,5 +99,13 @@ public class MySubscriptionItemVO {
 
     public void setSubscribedAt(LocalDateTime subscribedAt) {
         this.subscribedAt = subscribedAt;
+    }
+
+    public List<SubscriptionVersionAction> getPendingVersionActions() {
+        return pendingVersionActions;
+    }
+
+    public void setPendingVersionActions(List<SubscriptionVersionAction> pendingVersionActions) {
+        this.pendingVersionActions = pendingVersionActions;
     }
 }

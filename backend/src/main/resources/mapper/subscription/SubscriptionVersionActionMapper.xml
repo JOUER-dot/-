@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.subscription.mapper.SubscriptionVersionActionMapper">
+
+    <resultMap id="SubscriptionVersionActionResultMap" type="com.finance.roboadvisor.subscription.entity.SubscriptionVersionAction">
+        <id property="id" column="id"/>
+        <result property="subscriptionId" column="subscription_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="productVersionId" column="product_version_id"/>
+        <result property="actionType" column="action_type"/>
+        <result property="actionStatus" column="action_status"/>
+        <result property="changeType" column="change_type"/>
+        <result property="versionNote" column="version_note"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="handledAt" column="handled_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.finance.roboadvisor.subscription.entity.SubscriptionVersionAction" useGeneratedKeys="true" keyProperty="id">
+        insert into subscription_version_action (
+            subscription_id, product_id, product_version_id, action_type,
+            action_status, change_type, version_note, handled_at
+        ) values (
+            #{subscriptionId}, #{productId}, #{productVersionId}, #{actionType},
+            #{actionStatus}, #{changeType}, #{versionNote}, #{handledAt}
+        )
+    </insert>
+
+    <update id="updateStatus">
+        update subscription_version_action
+        set action_status = #{actionStatus},
+            handled_at = now()
+        where id = #{id}
+    </update>
+
+    <select id="selectPendingByUserId" resultMap="SubscriptionVersionActionResultMap">
+        select sva.id, sva.subscription_id, sva.product_id, sva.product_version_id,
+               sva.action_type, sva.action_status, sva.change_type, sva.version_note,
+               sva.created_at, sva.handled_at
+        from subscription_version_action sva
+                 inner join advisor_product_subscription s on s.id = sva.subscription_id
+        where s.user_id = #{userId}
+          and sva.action_status = 'PENDING'
+        order by sva.created_at desc, sva.id desc
+    </select>
+
+    <select id="selectLatestPendingBySubscriptionId" resultMap="SubscriptionVersionActionResultMap">
+        select id, subscription_id, product_id, product_version_id,
+               action_type, action_status, change_type, version_note,
+               created_at, handled_at
+        from subscription_version_action
+        where subscription_id = #{subscriptionId}
+          and action_status = 'PENDING'
+        order by created_at desc, id desc
+        limit 1
+    </select>
+
+    <select id="selectPendingBySubscriptionIds" resultMap="SubscriptionVersionActionResultMap">
+        select id, subscription_id, product_id, product_version_id,
+               action_type, action_status, change_type, version_note,
+               created_at, handled_at
+        from subscription_version_action
+        where action_status = 'PENDING'
+          and subscription_id in
+        <foreach collection="subscriptionIds" item="subscriptionId" open="(" separator="," close=")">
+            #{subscriptionId}
+        </foreach>
+        order by created_at desc, id desc
+    </select>
+</mapper>

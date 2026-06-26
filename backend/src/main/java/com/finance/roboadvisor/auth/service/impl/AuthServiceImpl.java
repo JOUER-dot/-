@@ -1,7 +1,9 @@
 package com.finance.roboadvisor.auth.service.impl;
 
+import com.finance.roboadvisor.auth.dto.ChangePasswordDTO;
 import com.finance.roboadvisor.auth.dto.LoginDTO;
 import com.finance.roboadvisor.auth.dto.RegisterDTO;
+import com.finance.roboadvisor.auth.dto.UpdateProfileDTO;
 import com.finance.roboadvisor.auth.entity.SysRole;
 import com.finance.roboadvisor.auth.entity.SysUser;
 import com.finance.roboadvisor.auth.entity.SysUserRole;
@@ -130,6 +132,8 @@ public class AuthServiceImpl implements AuthService {
         currentUserVO.setId(user.getId());
         currentUserVO.setUsername(user.getUsername());
         currentUserVO.setNickname(user.getNickname());
+        currentUserVO.setPhone(user.getPhone());
+        currentUserVO.setEmail(user.getEmail());
         currentUserVO.setRoles(roles);
         return currentUserVO;
     }
@@ -137,5 +141,42 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout() {
         SecurityUtil.getCurrentUserId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void changePassword(ChangePasswordDTO dto) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        SysUser user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_FOUND);
+        }
+        if (!passwordEncoder.matches(dto.getOldPassword(), user.getPasswordHash())) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED, "旧密码不正确");
+        }
+        if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
+            throw new BusinessException(ResultCode.PASSWORD_NOT_MATCH);
+        }
+        userMapper.updatePassword(userId, passwordEncoder.encode(dto.getNewPassword()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateProfile(UpdateProfileDTO dto) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        SysUser user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_FOUND);
+        }
+        if (StringUtils.hasText(dto.getNickname())) {
+            user.setNickname(dto.getNickname());
+        }
+        if (StringUtils.hasText(dto.getPhone())) {
+            user.setPhone(dto.getPhone());
+        }
+        if (dto.getEmail() != null) {
+            user.setEmail(dto.getEmail());
+        }
+        userMapper.updateProfile(user);
     }
 }

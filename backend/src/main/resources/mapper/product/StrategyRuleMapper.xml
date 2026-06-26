@@ -32,4 +32,11 @@
           and status = 1
         limit 1
     </select>
+
+    <select id="selectAllEnabled" resultMap="StrategyRuleResultMap">
+        select <include refid="BaseColumns"/>
+        from advisor_strategy_rule
+        where status = 1
+        order by strategy_code asc
+    </select>
 </mapper>

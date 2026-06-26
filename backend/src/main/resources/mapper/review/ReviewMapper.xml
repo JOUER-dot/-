@@ -72,4 +72,18 @@
           and v.version_status = 'SUBMITTED'
         limit 1
     </select>
+
+    <select id="selectReviewHistoryByReviewer" resultType="com.finance.roboadvisor.review.vo.ReviewHistoryItemVO">
+        select r.id as id,
+               r.product_id as productId,
+               p.name as productName,
+               r.result as result,
+               r.comment as comment,
+               r.reviewed_at as reviewedAt
+        from advisor_product_review r
+                 inner join advisor_product p on p.id = r.product_id
+        where r.reviewer_id = #{reviewerId}
+        order by r.reviewed_at desc, r.id desc
+        limit #{pageSize} offset #{offset}
+    </select>
 </mapper>

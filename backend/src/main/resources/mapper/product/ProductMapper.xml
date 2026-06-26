@@ -115,4 +115,8 @@
         select count(1)
         <include refid="ListWhere"/>
     </select>
+
+    <delete id="deleteById">
+        delete from advisor_product where id = #{id}
+    </delete>
 </mapper>

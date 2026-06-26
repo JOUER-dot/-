@@ -10,6 +10,9 @@ public class AdvisorProductVersion {
     private String baseInfoJson;
     private String paramsJson;
     private String versionStatus;
+    private String changeType;
+    private Long baseVersionId;
+    private String versionNote;
     private String statusAtSubmit;
     private LocalDateTime submittedAt;
     private LocalDateTime createdAt;
@@ -60,6 +63,30 @@ public class AdvisorProductVersion {
 
     public void setVersionStatus(String versionStatus) {
         this.versionStatus = versionStatus;
+    }
+
+    public String getChangeType() {
+        return changeType;
+    }
+
+    public void setChangeType(String changeType) {
+        this.changeType = changeType;
+    }
+
+    public Long getBaseVersionId() {
+        return baseVersionId;
+    }
+
+    public void setBaseVersionId(Long baseVersionId) {
+        this.baseVersionId = baseVersionId;
+    }
+
+    public String getVersionNote() {
+        return versionNote;
+    }
+
+    public void setVersionNote(String versionNote) {
+        this.versionNote = versionNote;
     }
 
     public String getStatusAtSubmit() {

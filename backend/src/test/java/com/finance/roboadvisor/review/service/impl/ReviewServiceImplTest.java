@@ -23,6 +23,10 @@ import com.finance.roboadvisor.product.vo.DraftComponentVO;
 import com.finance.roboadvisor.review.dto.ReviewApproveDTO;
 import com.finance.roboadvisor.review.dto.ReviewRejectDTO;
 import com.finance.roboadvisor.review.mapper.ReviewMapper;
+import com.finance.roboadvisor.subscription.service.SubscriptionService;
+import com.finance.roboadvisor.review.vo.ReviewDetailVO;
+import com.finance.roboadvisor.review.vo.ReviewDiffComponentVO;
+import com.finance.roboadvisor.review.vo.ReviewDiffFieldVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +38,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -77,6 +82,9 @@ class ReviewServiceImplTest {
     @Mock
     private ProductHoldingSnapshotGenerationService productHoldingSnapshotGenerationService;
 
+    @Mock
+    private SubscriptionService subscriptionService;
+
     private ReviewServiceImpl reviewService;
 
     @BeforeEach
@@ -93,6 +101,7 @@ class ReviewServiceImplTest {
                 strategyRuleValidationService,
                 productNavGenerationService,
                 productHoldingSnapshotGenerationService,
+                subscriptionService,
                 new ObjectMapper()
         );
 
@@ -198,5 +207,191 @@ class ReviewServiceImplTest {
 
         verify(productReviewMapper).insert(any(AdvisorProductReview.class));
         verify(productFlowLogMapper).insert(any(AdvisorProductFlowLog.class));
+    }
+
+    @Test
+    void approveProduct_shouldCreateConfirmRequiredActionsForMajorChange() {
+        AdvisorProduct product = new AdvisorProduct();
+        product.setId(12L);
+        product.setStatus("PENDING_REVIEW");
+        product.setType("STRATEGY");
+        product.setStrategyCode("BALANCE_ALPHA");
+        product.setCurrentVersionNo(4);
+
+        AdvisorProductVersion version = new AdvisorProductVersion();
+        version.setId(31L);
+        version.setProductId(12L);
+        version.setVersionNo(4);
+        version.setVersionStatus("SUBMITTED");
+        version.setChangeType("MAJOR");
+        version.setVersionNote("调仓并提升风险等级");
+
+        DraftComponentVO component = new DraftComponentVO();
+        component.setFundId(201L);
+        component.setFundCode("110023");
+        component.setFundName("中欧医疗健康混合");
+        component.setWeight(new BigDecimal("0.4000"));
+
+        AdvisorStrategyRule rule = new AdvisorStrategyRule();
+        rule.setId(19L);
+        rule.setStrategyCode("BALANCE_ALPHA");
+        rule.setProductType("STRATEGY");
+        rule.setMinFundCount(1);
+        rule.setMaxFundCount(10);
+        rule.setMinSingleWeight(new BigDecimal("0.0500"));
+        rule.setMaxSingleWeight(new BigDecimal("0.6000"));
+
+        when(productMapper.selectById(12L)).thenReturn(product);
+        when(productVersionMapper.selectLatestSubmittedByProductId(12L)).thenReturn(version);
+        when(productComponentMapper.selectByVersionId(31L)).thenReturn(List.of(component));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("BALANCE_ALPHA", "STRATEGY")).thenReturn(rule);
+
+        reviewService.approveProduct(12L, new ReviewApproveDTO());
+
+        verify(subscriptionService).createVersionActions(
+                12L,
+                31L,
+                "MAJOR",
+                "CONFIRM_REQUIRED",
+                "PENDING",
+                "调仓并提升风险等级"
+        );
+    }
+
+    @Test
+    void approveProduct_shouldCreateNoticeActionsForNormalChange() {
+        AdvisorProduct product = new AdvisorProduct();
+        product.setId(13L);
+        product.setStatus("PENDING_REVIEW");
+        product.setType("STRATEGY");
+        product.setStrategyCode("BALANCE_ALPHA");
+        product.setCurrentVersionNo(5);
+
+        AdvisorProductVersion version = new AdvisorProductVersion();
+        version.setId(41L);
+        version.setProductId(13L);
+        version.setVersionNo(5);
+        version.setVersionStatus("SUBMITTED");
+        version.setChangeType("NORMAL");
+        version.setVersionNote("优化文案描述");
+
+        DraftComponentVO component = new DraftComponentVO();
+        component.setFundId(202L);
+        component.setFundCode("110024");
+        component.setFundName("富国天惠成长混合");
+        component.setWeight(new BigDecimal("0.3500"));
+
+        AdvisorStrategyRule rule = new AdvisorStrategyRule();
+        rule.setId(20L);
+        rule.setStrategyCode("BALANCE_ALPHA");
+        rule.setProductType("STRATEGY");
+        rule.setMinFundCount(1);
+        rule.setMaxFundCount(10);
+        rule.setMinSingleWeight(new BigDecimal("0.0500"));
+        rule.setMaxSingleWeight(new BigDecimal("0.6000"));
+
+        when(productMapper.selectById(13L)).thenReturn(product);
+        when(productVersionMapper.selectLatestSubmittedByProductId(13L)).thenReturn(version);
+        when(productComponentMapper.selectByVersionId(41L)).thenReturn(List.of(component));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("BALANCE_ALPHA", "STRATEGY")).thenReturn(rule);
+
+        reviewService.approveProduct(13L, new ReviewApproveDTO());
+
+        verify(subscriptionService).createVersionActions(
+                13L,
+                41L,
+                "NORMAL",
+                "NOTICE",
+                "NOTIFIED",
+                "优化文案描述"
+        );
+    }
+
+    @Test
+    void getPendingProductDetailShouldReturnFieldAndComponentDiffs() {
+        ReviewDetailVO pendingDetail = new ReviewDetailVO();
+        pendingDetail.setId(9L);
+        pendingDetail.setName("进取成长组合C升级版");
+        pendingDetail.setType("STRATEGY");
+        pendingDetail.setRiskLevel("R4");
+        pendingDetail.setVersionId(19L);
+        pendingDetail.setVersionNo(3);
+        pendingDetail.setVersionStatus("SUBMITTED");
+        pendingDetail.setSubmittedAt(LocalDateTime.of(2026, 6, 26, 10, 0));
+        pendingDetail.setFeatureTagsText("进取,成长");
+        pendingDetail.setBaseInfoJson("""
+                {"name":"进取成长组合C升级版","type":"STRATEGY","riskLevel":"R4","productSummary":"升级后的成长策略","targetCustomer":"进取型投资者","riskTips":"净值波动较大"}
+                """);
+        pendingDetail.setParamsJson("""
+                {"rebalanceCycleDays":14,"minSingleFundWeight":0.10,"maxSingleFundWeight":0.55,"investHorizonMonths":18,"strategyNotes":"成长风格更聚焦"}
+                """);
+
+        AdvisorProductVersion currentVersion = new AdvisorProductVersion();
+        currentVersion.setId(19L);
+        currentVersion.setProductId(9L);
+        currentVersion.setVersionNo(3);
+        currentVersion.setVersionStatus("SUBMITTED");
+        currentVersion.setBaseVersionId(11L);
+        currentVersion.setChangeType("MAJOR");
+        currentVersion.setVersionNote("调仓并提升风险等级");
+        currentVersion.setSubmittedAt(LocalDateTime.of(2026, 6, 26, 10, 0));
+
+        AdvisorProductVersion baseVersion = new AdvisorProductVersion();
+        baseVersion.setId(11L);
+        baseVersion.setProductId(9L);
+        baseVersion.setVersionNo(2);
+        baseVersion.setVersionStatus("APPROVED");
+        baseVersion.setSubmittedAt(LocalDateTime.of(2026, 6, 20, 9, 0));
+        baseVersion.setBaseInfoJson("""
+                {"name":"进取成长组合C","type":"STRATEGY","riskLevel":"R3","productSummary":"成长策略","targetCustomer":"成长型投资者","riskTips":"净值存在波动"}
+                """);
+        baseVersion.setParamsJson("""
+                {"rebalanceCycleDays":30,"minSingleFundWeight":0.10,"maxSingleFundWeight":0.40,"investHorizonMonths":12,"strategyNotes":"均衡成长"}
+                """);
+
+        DraftComponentVO removedComponent = new DraftComponentVO();
+        removedComponent.setFundId(101L);
+        removedComponent.setFundCode("000001");
+        removedComponent.setFundName("沪深300ETF");
+        removedComponent.setWeight(new BigDecimal("0.40"));
+
+        DraftComponentVO updatedBaseComponent = new DraftComponentVO();
+        updatedBaseComponent.setFundId(102L);
+        updatedBaseComponent.setFundCode("000002");
+        updatedBaseComponent.setFundName("纳指ETF");
+        updatedBaseComponent.setWeight(new BigDecimal("0.30"));
+
+        DraftComponentVO updatedCurrentComponent = new DraftComponentVO();
+        updatedCurrentComponent.setFundId(102L);
+        updatedCurrentComponent.setFundCode("000002");
+        updatedCurrentComponent.setFundName("纳指ETF");
+        updatedCurrentComponent.setWeight(new BigDecimal("0.45"));
+
+        DraftComponentVO addedComponent = new DraftComponentVO();
+        addedComponent.setFundId(103L);
+        addedComponent.setFundCode("000003");
+        addedComponent.setFundName("中证1000ETF");
+        addedComponent.setWeight(new BigDecimal("0.15"));
+
+        when(reviewMapper.selectPendingProductDetail(9L)).thenReturn(pendingDetail);
+        when(productVersionMapper.selectById(19L)).thenReturn(currentVersion);
+        when(productVersionMapper.selectById(11L)).thenReturn(baseVersion);
+        when(productComponentMapper.selectByVersionId(19L)).thenReturn(List.of(updatedCurrentComponent, addedComponent));
+        when(productComponentMapper.selectByVersionId(11L)).thenReturn(List.of(removedComponent, updatedBaseComponent));
+        when(productReviewMapper.selectByProductId(9L)).thenReturn(List.of());
+
+        ReviewDetailVO detail = reviewService.getPendingProductDetail(9L);
+
+        assertThat(detail.getChangeType()).isEqualTo("MAJOR");
+        assertThat(detail.getVersionNote()).isEqualTo("调仓并提升风险等级");
+        assertThat(detail.getBaseVersionSummary()).isNotNull();
+        assertThat(detail.getBaseVersionSummary().getVersionNo()).isEqualTo(2);
+        assertThat(detail.getCurrentVersionSummary()).isNotNull();
+        assertThat(detail.getCurrentVersionSummary().getVersionNo()).isEqualTo(3);
+        assertThat(detail.getFieldDiffs()).extracting(ReviewDiffFieldVO::getFieldKey)
+                .contains("riskLevel", "productSummary", "targetCustomer", "riskTips",
+                        "rebalanceCycleDays", "maxSingleFundWeight", "investHorizonMonths", "strategyNotes");
+        assertThat(detail.getComponentDiffs()).extracting(ReviewDiffComponentVO::getDiffType)
+                .contains("ADDED", "REMOVED", "UPDATED");
     }
 }

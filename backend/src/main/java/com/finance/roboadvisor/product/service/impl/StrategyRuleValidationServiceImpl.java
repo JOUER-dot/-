@@ -27,7 +27,7 @@ public class StrategyRuleValidationServiceImpl implements StrategyRuleValidation
                                 StrategyRuleOverride override) {
         AdvisorStrategyRule rule = strategyRuleMapper.selectEnabledByStrategyAndType(strategyCode, productType);
         if (rule == null) {
-            throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "未配置策略规则，不能提交审核");
+            return;
         }
 
         int componentCount = components == null ? 0 : components.size();

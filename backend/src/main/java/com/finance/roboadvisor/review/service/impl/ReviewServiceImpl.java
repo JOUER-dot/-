@@ -6,7 +6,9 @@ import com.finance.roboadvisor.common.api.PageResult;
 import com.finance.roboadvisor.common.api.ResultCode;
 import com.finance.roboadvisor.common.exception.BusinessException;
 import com.finance.roboadvisor.common.util.SecurityUtil;
+import com.finance.roboadvisor.notification.service.NotificationService;
 import com.finance.roboadvisor.product.entity.AdvisorProduct;
+import com.finance.roboadvisor.product.entity.AdvisorProductFlowLog;
 import com.finance.roboadvisor.product.entity.AdvisorProductFlowLog;
 import com.finance.roboadvisor.product.entity.AdvisorProductRuleDecision;
 import com.finance.roboadvisor.product.entity.AdvisorProductReview;
@@ -27,9 +29,12 @@ import com.finance.roboadvisor.product.vo.ReviewRecordVO;
 import com.finance.roboadvisor.review.dto.ReviewApproveDTO;
 import com.finance.roboadvisor.review.dto.ReviewRejectDTO;
 import com.finance.roboadvisor.review.mapper.ReviewMapper;
+import com.finance.roboadvisor.review.support.ReviewDiffBuilder;
 import com.finance.roboadvisor.review.service.ReviewService;
 import com.finance.roboadvisor.review.vo.ReviewDetailVO;
+import com.finance.roboadvisor.review.vo.ReviewHistoryItemVO;
 import com.finance.roboadvisor.review.vo.ReviewPendingListItemVO;
+import com.finance.roboadvisor.subscription.service.SubscriptionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -49,6 +54,11 @@ public class ReviewServiceImpl implements ReviewService {
     private static final String VERSION_REJECTED = "REJECTED";
     private static final String FLOW_APPROVE = "APPROVE";
     private static final String FLOW_REJECT = "REJECT";
+    private static final String CHANGE_TYPE_MAJOR = "MAJOR";
+    private static final String ACTION_TYPE_NOTICE = "NOTICE";
+    private static final String ACTION_TYPE_CONFIRM_REQUIRED = "CONFIRM_REQUIRED";
+    private static final String ACTION_STATUS_NOTIFIED = "NOTIFIED";
+    private static final String ACTION_STATUS_PENDING = "PENDING";
     private static final int DEFAULT_PAGE_NUM = 1;
     private static final int DEFAULT_PAGE_SIZE = 10;
 
@@ -63,7 +73,10 @@ public class ReviewServiceImpl implements ReviewService {
     private final StrategyRuleValidationService strategyRuleValidationService;
     private final ProductNavGenerationService productNavGenerationService;
     private final ProductHoldingSnapshotGenerationService productHoldingSnapshotGenerationService;
+    private final SubscriptionService subscriptionService;
     private final ObjectMapper objectMapper;
+    private final ReviewDiffBuilder reviewDiffBuilder;
+    private final NotificationService notificationService;
 
     public ReviewServiceImpl(ReviewMapper reviewMapper,
                              ProductMapper productMapper,
@@ -76,6 +89,8 @@ public class ReviewServiceImpl implements ReviewService {
                              StrategyRuleValidationService strategyRuleValidationService,
                              ProductNavGenerationService productNavGenerationService,
                              ProductHoldingSnapshotGenerationService productHoldingSnapshotGenerationService,
+                             SubscriptionService subscriptionService,
+                             NotificationService notificationService,
                              ObjectMapper objectMapper) {
         this.reviewMapper = reviewMapper;
         this.productMapper = productMapper;
@@ -88,7 +103,10 @@ public class ReviewServiceImpl implements ReviewService {
         this.strategyRuleValidationService = strategyRuleValidationService;
         this.productNavGenerationService = productNavGenerationService;
         this.productHoldingSnapshotGenerationService = productHoldingSnapshotGenerationService;
+        this.subscriptionService = subscriptionService;
+        this.notificationService = notificationService;
         this.objectMapper = objectMapper;
+        this.reviewDiffBuilder = new ReviewDiffBuilder(objectMapper);
     }
 
     @Override
@@ -126,9 +144,30 @@ public class ReviewServiceImpl implements ReviewService {
         detail.setFeatureTags(splitFeatureTags(detail.getFeatureTagsText()));
         detail.setBaseInfo(readMap(detail.getBaseInfoJson()));
         detail.setParams(readMap(detail.getParamsJson()));
-        detail.setComponents(productComponentMapper.selectByVersionId(detail.getVersionId()));
+        AdvisorProductVersion currentVersion = productVersionMapper.selectById(detail.getVersionId());
+        List<DraftComponentVO> currentComponents = productComponentMapper.selectByVersionId(detail.getVersionId());
+        detail.setComponents(currentComponents);
         List<ReviewRecordVO> reviewRecords = productReviewMapper.selectByProductId(productId);
         detail.setReviewSummary(reviewRecords);
+        AdvisorProductVersion baseVersion = currentVersion != null && currentVersion.getBaseVersionId() != null
+                ? productVersionMapper.selectById(currentVersion.getBaseVersionId())
+                : null;
+        List<DraftComponentVO> baseComponents = baseVersion == null
+                ? List.of()
+                : productComponentMapper.selectByVersionId(baseVersion.getId());
+        ReviewDiffBuilder.ReviewDiffResult diffResult = reviewDiffBuilder.build(
+                currentVersion,
+                baseVersion,
+                detail,
+                baseComponents,
+                currentComponents
+        );
+        detail.setBaseVersionSummary(diffResult.getBaseVersionSummary());
+        detail.setCurrentVersionSummary(diffResult.getCurrentVersionSummary());
+        detail.setFieldDiffs(diffResult.getFieldDiffs());
+        detail.setComponentDiffs(diffResult.getComponentDiffs());
+        detail.setChangeType(currentVersion == null ? null : currentVersion.getChangeType());
+        detail.setVersionNote(currentVersion == null ? null : currentVersion.getVersionNote());
         return detail;
     }
 
@@ -142,18 +181,38 @@ public class ReviewServiceImpl implements ReviewService {
         validateDecisionComment(dto, override);
         List<DraftComponentVO> components = productComponentMapper.selectByVersionId(version.getId());
         strategyRuleValidationService.validateOrThrow(product.getStrategyCode(), product.getType(), components, override);
-        AdvisorStrategyRule baseRule = strategyRuleMapper.selectEnabledByStrategyAndType(product.getStrategyCode(), product.getType());
-        if (baseRule == null) {
-            throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "未配置策略规则，不能提交审核");
-        }
-        insertRuleDecision(productId, version.getId(), reviewerId, baseRule, dto, override);
 
+        // Step 1: Update product status to PUBLISHED first
         productMapper.updateApprovedReviewOutcome(productId, STATUS_PUBLISHED, version.getVersionNo());
         productVersionMapper.updateVersionStatus(version.getId(), VERSION_APPROVED);
         insertReview(productId, version.getId(), reviewerId, VERSION_APPROVED, "审核通过");
         insertFlowLog(productId, version.getId(), reviewerId, FLOW_APPROVE, "审核通过");
+
+        // Step 2: Handle subscription version actions
+        if (CHANGE_TYPE_MAJOR.equals(version.getChangeType())) {
+            subscriptionService.createVersionActions(productId, version.getId(), version.getChangeType(),
+                    ACTION_TYPE_CONFIRM_REQUIRED, ACTION_STATUS_PENDING, version.getVersionNote());
+        } else {
+            subscriptionService.createVersionActions(productId, version.getId(), version.getChangeType(),
+                    ACTION_TYPE_NOTICE, ACTION_STATUS_NOTIFIED, version.getVersionNote());
+        }
+
+        // Step 3: Insert rule decision if applicable
+        AdvisorStrategyRule baseRule = strategyRuleMapper.selectEnabledByStrategyAndType(product.getStrategyCode(), product.getType());
+        if (baseRule != null) {
+            insertRuleDecision(productId, version.getId(), reviewerId, baseRule, dto, override);
+        }
+
+        // Step 4: Generate NAV and holding snapshot (product is now PUBLISHED)
         productNavGenerationService.generatePublishedProductNav(productId);
         productHoldingSnapshotGenerationService.generatePublishedHoldingSnapshot(productId);
+
+        // Step 5: Notify the product creator
+        notificationService.createNotification(product.getCreatorId(),
+                "审核通过",
+                "您的产品「" + product.getName() + "」已通过审核，现已发布。",
+                "REVIEW_RESULT",
+                "/admin/products/" + productId);
     }
 
     @Override
@@ -161,13 +220,57 @@ public class ReviewServiceImpl implements ReviewService {
     public void rejectProduct(Long productId, ReviewRejectDTO dto) {
         Long reviewerId = SecurityUtil.getCurrentUserId();
         String comment = dto.getComment().trim();
-        getPendingProduct(productId);
+        AdvisorProduct product = getPendingProduct(productId);
         AdvisorProductVersion version = getPendingSubmittedVersion(productId);
 
         productMapper.updateRejectedReviewOutcome(productId, STATUS_REJECTED, comment);
         productVersionMapper.updateVersionStatus(version.getId(), VERSION_REJECTED);
         insertReview(productId, version.getId(), reviewerId, VERSION_REJECTED, comment);
         insertFlowLog(productId, version.getId(), reviewerId, FLOW_REJECT, comment);
+
+        // Notify the product creator
+        notificationService.createNotification(product.getCreatorId(),
+                "审核驳回",
+                "您的产品「" + product.getName() + "」已被驳回。驳回意见：" + comment,
+                "REVIEW_RESULT",
+                "/admin/products/" + productId + "/edit");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchApprove(List<Long> productIds, ReviewApproveDTO dto) {
+        Long reviewerId = SecurityUtil.getCurrentUserId();
+        for (Long productId : productIds) {
+            try {
+                approveProduct(productId, dto);
+            } catch (Exception ex) {
+                throw new BusinessException(ResultCode.VALIDATE_FAILED,
+                        "产品 " + productId + " 批量审核通过失败: " + ex.getMessage());
+            }
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchReject(List<Long> productIds, ReviewRejectDTO dto) {
+        Long reviewerId = SecurityUtil.getCurrentUserId();
+        for (Long productId : productIds) {
+            try {
+                rejectProduct(productId, dto);
+            } catch (Exception ex) {
+                throw new BusinessException(ResultCode.VALIDATE_FAILED,
+                        "产品 " + productId + " 批量审核驳回失败: " + ex.getMessage());
+            }
+        }
+    }
+
+    @Override
+    public List<ReviewHistoryItemVO> getMyReviewHistory(Integer pageNum, Integer pageSize) {
+        Long reviewerId = SecurityUtil.getCurrentUserId();
+        if (pageNum == null || pageNum < 1) pageNum = DEFAULT_PAGE_NUM;
+        if (pageSize == null || pageSize < 1) pageSize = DEFAULT_PAGE_SIZE;
+        return reviewMapper.selectReviewHistoryByReviewer(reviewerId,
+                (pageNum - 1) * pageSize, pageSize);
     }
 
     private AdvisorProduct getPendingProduct(Long productId) {

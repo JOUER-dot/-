@@ -9,8 +9,15 @@ export interface PublicProductListItem {
   riskLevel: string
   strategyCode: string
   featureTags: string[]
+  creatorName?: string
+  fundCompanies?: string[]
   latestNav?: number
   latestCumReturn?: number
+}
+
+export interface PublicAdvisorOption {
+  id: number
+  name: string
 }
 
 export interface PublicProductNavPoint {
@@ -40,6 +47,8 @@ export interface PublicProductQueryParams {
   keyword?: string
   type?: string
   riskLevel?: string
+  creatorId?: number
+  fundCompany?: string
   pageNum?: number
   pageSize?: number
 }
@@ -50,4 +59,8 @@ export function getPublishedProductList(params: PublicProductQueryParams) {
 
 export function getPublishedProductDetail(productId: number) {
   return request.get<PublicProductDetail>(`/public/advisor-products/${productId}`)
+}
+
+export function getAdvisorList() {
+  return request.get<PublicAdvisorOption[]>('/public/advisor-products/advisors')
 }

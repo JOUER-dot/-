@@ -12,10 +12,7 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({
-  username: '',
-  password: ''
-})
+const form = reactive({ username: '', password: '' })
 
 const rules: FormRules<typeof form> = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
@@ -23,195 +20,436 @@ const rules: FormRules<typeof form> = {
 }
 
 const handleLogin = async () => {
-  if (!formRef.value) {
-    return
-  }
+  if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
-    if (!valid) {
-      return
-    }
+    if (!valid) return
     loading.value = true
     try {
       await userStore.login(form)
       ElMessage.success('登录成功')
-      const redirect =
-        typeof route.query.redirect === 'string'
-          ? route.query.redirect
-          : getDefaultHomeByRoles(userStore.roles)
+      const redirect = typeof route.query.redirect === 'string'
+        ? route.query.redirect
+        : getDefaultHomeByRoles(userStore.roles)
       await router.replace(redirect)
-    } finally {
-      loading.value = false
-    }
+    } finally { loading.value = false }
   })
 }
 </script>
 
 <template>
-  <div class="auth-page">
-    <div class="auth-card">
-      <div class="auth-intro">
-        <div class="brand">
-          <span class="brand__mark" />
-          <div class="brand__text">
-            <div class="brand__name">智能投顾平台</div>
-            <div class="brand__sub">组合产品管理子系统</div>
+  <div class="landing">
+    <!-- 顶部导航 -->
+    <header class="nav">
+      <div class="nav-inner">
+        <div class="nav-brand">
+          <span class="nav-brand__dot" />
+          <span class="nav-brand__text">智能投顾</span>
+        </div>
+        <div class="nav-links">
+          <el-button text class="nav-link" @click="router.push('/advisor-zone')">产品专区</el-button>
+          <el-button type="primary" class="nav-btn" @click="router.push('/login')">登录</el-button>
+          <el-button text class="nav-link" @click="router.push('/register')">注册</el-button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="main">
+      <div class="main-glow main-glow--1" />
+      <div class="main-glow main-glow--2" />
+      <div class="main-grid" />
+
+      <div class="main-content">
+        <div class="hero">
+          <div class="hero-badge">ROBO ADVISOR</div>
+          <h1 class="hero-title">智能投顾平台</h1>
+          <p class="hero-sub">专业基金投顾 · 智能资产配置 · 一站式管理</p>
+          <div class="hero-actions">
+            <el-button type="primary" size="large" class="hero-btn hero-btn--primary" @click="router.push('/advisor-zone')">
+              浏览产品
+            </el-button>
+            <el-button size="large" class="hero-btn hero-btn--outline" @click="router.push('/register')">
+              注册体验
+            </el-button>
           </div>
         </div>
 
-        <div class="role-row">
-          <el-tag effect="dark" class="role-tag">USER</el-tag>
-          <el-tag effect="plain" class="role-tag role-tag--plain">ADVISOR</el-tag>
-          <el-tag effect="plain" class="role-tag role-tag--plain">REVIEWER</el-tag>
-        </div>
-      </div>
-
-      <div class="auth-form-wrap">
-        <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="auth-form">
-          <div class="form-title">欢迎登录</div>
-          <div class="form-subtitle">请输入账号与密码继续</div>
-          <el-form-item label="用户名" prop="username">
-            <el-input v-model="form.username" placeholder="请输入用户名" />
-          </el-form-item>
-          <el-form-item label="密码" prop="password">
-            <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
-          </el-form-item>
-          <div class="form-actions">
-            <el-button type="primary" class="form-button" :loading="loading" @click="handleLogin">
+        <!-- 登录面板 -->
+        <div class="login-panel">
+          <h2 class="login-title">登录</h2>
+          <p class="login-desc">登录后管理您的投资组合</p>
+          <el-form ref="formRef" :model="form" :rules="rules" class="login-form" @keyup.enter="handleLogin">
+            <div class="field">
+              <label class="field-label">用户名</label>
+              <el-input v-model="form.username" placeholder="请输入用户名" class="field-input" />
+            </div>
+            <div class="field">
+              <label class="field-label">密码</label>
+              <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" class="field-input" />
+            </div>
+            <el-button type="primary" class="login-btn" :loading="loading" @click="handleLogin">
               登录
             </el-button>
-            <el-button class="form-button form-button--ghost" @click="router.push('/register')">
-              去注册
-            </el-button>
+          </el-form>
+          <div class="login-footer">
+            <el-button link @click="router.push('/register')">没有账号？去注册</el-button>
           </div>
-        </el-form>
+        </div>
       </div>
-    </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+      <div class="footer-inner">
+        <div class="footer-roles">
+          <span class="footer-role">用户端</span>
+          <span class="footer-dot" />
+          <span class="footer-role">投顾端</span>
+          <span class="footer-dot" />
+          <span class="footer-role">审核端</span>
+          <span class="footer-dot" />
+          <span class="footer-role">管理端</span>
+        </div>
+        <span class="footer-version">RoboAdvisor v1.0</span>
+      </div>
+    </footer>
   </div>
 </template>
 
+<style>
+/* ========== 全局字体覆盖 ========== */
+.landing {
+  --font-display: 'Noto Serif SC', 'PingFang SC', 'Microsoft YaHei', serif;
+  --font-sans: 'PingFang SC', 'Microsoft YaHei', 'Noto Serif SC', sans-serif;
+}
+
+.landing * {
+  font-family: var(--font-sans);
+}
+
+.landing h1, .landing h2, .landing .hero-badge, .landing .nav-brand__text {
+  font-family: var(--font-display);
+}
+</style>
+
 <style scoped>
-.auth-page {
+.landing {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: linear-gradient(180deg, #f0f4fa 0%, #e8eef6 100%);
+}
+
+/* ===== 导航 ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(14,46,85,0.06);
+}
+.nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 32px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-brand__dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #c8a45d;
+  box-shadow: 0 0 12px rgba(200,164,93,0.3);
+}
+.nav-brand__text {
+  font-size: 18px;
+  font-weight: 900;
+  color: #0e2e55;
+  letter-spacing: 2px;
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.nav-link {
+  font-size: 13px;
+  color: #5e6b7a;
+  padding: 6px 14px;
+}
+.nav-link:hover {
+  color: #0e2e55;
+}
+.nav-btn {
+  margin-left: 8px;
+}
+
+/* ===== 主体 ===== */
+.main {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  background:
-    radial-gradient(900px 420px at 12% 16%, rgba(22, 59, 102, 0.22), transparent 55%),
-    radial-gradient(700px 380px at 88% 20%, rgba(15, 157, 138, 0.16), transparent 55%),
-    linear-gradient(180deg, #ffffff 0%, var(--color-bg-page) 100%);
-}
-
-.auth-card {
-  width: 1000px;
-  max-width: 100%;
-  display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  overflow: hidden;
-  border-radius: 22px;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-card);
-}
-
-.auth-intro {
+  padding: 100px 24px 80px;
   position: relative;
-  padding: 46px;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--color-primary) 0%, #0f2a45 60%, #0b1f33 100%);
+  overflow: hidden;
 }
 
-.auth-intro::after {
-  content: '';
+.main-glow {
   position: absolute;
-  right: -120px;
-  top: -120px;
-  width: 260px;
-  height: 260px;
-  border-radius: 130px;
-  background: radial-gradient(circle at 30% 30%, rgba(201, 169, 110, 0.55), transparent 58%);
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(100px);
+}
+.main-glow--1 {
+  width: 500px; height: 500px;
+  top: -200px; left: 10%;
+  background: rgba(31,92,153,0.06);
+}
+.main-glow--2 {
+  width: 400px; height: 400px;
+  bottom: -150px; right: 10%;
+  background: rgba(200,164,93,0.05);
+}
+
+.main-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(14,46,85,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14,46,85,0.02) 1px, transparent 1px);
+  background-size: 80px 80px;
   pointer-events: none;
 }
 
-.brand {
+.main-content {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.brand__mark {
-  width: 12px;
-  height: 12px;
-  border-radius: 6px;
-  background: var(--color-gold);
-}
-
-.brand__name {
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: 0.6px;
-}
-
-.brand__sub {
-  margin-top: 8px;
-  opacity: 0.88;
-}
-
-.role-row {
-  margin-top: 28px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.role-tag {
-  border: none;
-}
-
-.role-tag--plain {
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
-.auth-form-wrap {
-  padding: 46px;
-}
-
-.form-title {
-  font-size: 22px;
-  font-weight: 900;
-  color: var(--color-text-1);
-  margin-bottom: 8px;
-}
-
-.form-subtitle {
-  color: var(--color-text-2);
-  margin-bottom: 18px;
-}
-
-.form-actions {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
-.form-button {
+  gap: 80px;
   width: 100%;
+  max-width: 1040px;
 }
 
-.form-button--ghost {
-  margin-left: 0;
+/* ===== Hero ===== */
+.hero {
+  flex: 1;
+  min-width: 0;
+}
+.hero-badge {
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #c8a45d;
+  padding: 6px 16px;
+  border: 1px solid rgba(200,164,93,0.2);
+  border-radius: 20px;
+  background: rgba(200,164,93,0.04);
+  margin-bottom: 24px;
+}
+.hero-title {
+  font-size: 56px;
+  font-weight: 900;
+  color: #0e2e55;
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: 4px;
+}
+.hero-sub {
+  font-size: 16px;
+  color: #8a94a3;
+  margin: 16px 0 0;
+  line-height: 1.6;
+  letter-spacing: 0.5px;
+}
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+}
+.hero-btn {
+  height: 48px;
+  padding: 0 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.hero-btn--primary {
+  background: #0e2e55;
+  border: none;
+  color: #fff;
+}
+.hero-btn--primary:hover {
+  background: #1a4070;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(14,46,85,0.2);
+}
+.hero-btn--outline {
+  background: transparent;
+  border: 1px solid #cfd6df;
+  color: #5e6b7a;
+}
+.hero-btn--outline:hover {
+  border-color: #0e2e55;
+  color: #0e2e55;
 }
 
-@media (max-width: 900px) {
-  .auth-card {
-    grid-template-columns: 1fr;
+/* ===== 登录面板 ===== */
+.login-panel {
+  width: 360px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 36px 32px;
+  box-shadow: 0 4px 24px rgba(14,46,85,0.06), 0 1px 4px rgba(14,46,85,0.03);
+  border: 1px solid rgba(14,46,85,0.04);
+}
+.login-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0e2e55;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+.login-desc {
+  font-size: 13px;
+  color: #8a94a3;
+  margin: 6px 0 24px;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0e2e55;
+  letter-spacing: 1px;
+}
+:deep(.field-input .el-input__wrapper) {
+  border-radius: 8px;
+  padding: 4px 16px;
+  height: 46px;
+  box-shadow: 0 0 0 1px #d6dce6 inset;
+  transition: all .25s ease;
+  background: #fafbfc;
+}
+:deep(.field-input .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #1f5c99 inset;
+  background: #fff;
+}
+:deep(.field-input .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px #1f5c99 inset;
+  background: #fff;
+}
+:deep(.field-input .el-input__inner) {
+  height: 46px;
+  font-size: 15px;
+  color: #0e2e55;
+  font-weight: 500;
+}
+:deep(.field-input .el-input__inner::placeholder) {
+  color: #b0b8c4;
+}
+.login-btn {
+  width: 100%;
+  height: 46px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: #0e2e55;
+  border: none;
+  color: #fff;
+  margin-top: 4px;
+  transition: all .3s ease;
+}
+.login-btn:hover {
+  background: #1a4070;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(14,46,85,0.2);
+}
+.login-footer {
+  text-align: center;
+  margin-top: 20px;
+}
+.login-footer :deep(.el-button) {
+  font-size: 12px;
+  color: #8a94a3;
+  padding: 0;
+  height: auto;
+}
+.login-footer :deep(.el-button:hover) {
+  color: #1f5c99;
+}
+
+/* ===== 页脚 ===== */
+.footer {
+  border-top: 1px solid rgba(14,46,85,0.04);
+  background: rgba(255,255,255,0.6);
+}
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-roles {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.footer-role {
+  font-size: 12px;
+  color: #8a94a3;
+  letter-spacing: 0.5px;
+}
+.footer-dot {
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: #cfd6df;
+}
+.footer-version {
+  font-size: 11px;
+  color: #b0b8c4;
+  letter-spacing: 0.5px;
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 860px) {
+  .main-content {
+    flex-direction: column;
+    gap: 48px;
   }
-
-  .auth-intro,
-  .auth-form-wrap {
-    padding: 28px;
+  .hero-title {
+    font-size: 36px;
+    letter-spacing: 2px;
+  }
+  .hero-actions {
+    flex-direction: column;
+  }
+  .login-panel {
+    width: 100%;
+    max-width: 400px;
   }
 }
 </style>

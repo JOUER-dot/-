@@ -1,6 +1,7 @@
 package com.finance.roboadvisor.review.mapper;
 
 import com.finance.roboadvisor.review.vo.ReviewDetailVO;
+import com.finance.roboadvisor.review.vo.ReviewHistoryItemVO;
 import com.finance.roboadvisor.review.vo.ReviewPendingListItemVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -21,4 +22,8 @@ public interface ReviewMapper {
                               @Param("riskLevel") String riskLevel);
 
     ReviewDetailVO selectPendingProductDetail(@Param("productId") Long productId);
+
+    List<ReviewHistoryItemVO> selectReviewHistoryByReviewer(@Param("reviewerId") Long reviewerId,
+                                                             @Param("offset") Integer offset,
+                                                             @Param("pageSize") Integer pageSize);
 }

@@ -13,4 +13,6 @@ public interface ProductReviewMapper {
     int insert(AdvisorProductReview review);
 
     List<ReviewRecordVO> selectByProductId(@Param("productId") Long productId);
+
+    int deleteByProductId(@Param("productId") Long productId);
 }

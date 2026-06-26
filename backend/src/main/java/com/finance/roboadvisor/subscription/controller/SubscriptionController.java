@@ -1,15 +1,18 @@
 package com.finance.roboadvisor.subscription.controller;
 
 import com.finance.roboadvisor.common.api.ApiResult;
+import com.finance.roboadvisor.common.api.PageResult;
+import com.finance.roboadvisor.subscription.dto.MySubscriptionQueryDTO;
+import com.finance.roboadvisor.subscription.dto.SubscriptionVersionDecisionDTO;
 import com.finance.roboadvisor.subscription.service.SubscriptionService;
 import com.finance.roboadvisor.subscription.vo.MySubscriptionItemVO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 @RequestMapping
@@ -34,7 +37,28 @@ public class SubscriptionController {
     }
 
     @GetMapping("/api/auth/my-subscriptions")
-    public ApiResult<List<MySubscriptionItemVO>> listMySubscriptions() {
-        return ApiResult.success(subscriptionService.listMySubscriptions());
+    public ApiResult<PageResult<MySubscriptionItemVO>> listMySubscriptions(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String subscriptionStatus,
+            @RequestParam(required = false) String productStatus,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) Integer pageNum,
+            @RequestParam(required = false) Integer pageSize
+    ) {
+        MySubscriptionQueryDTO queryDTO = new MySubscriptionQueryDTO();
+        queryDTO.setKeyword(keyword);
+        queryDTO.setSubscriptionStatus(subscriptionStatus);
+        queryDTO.setProductStatus(productStatus);
+        queryDTO.setSortBy(sortBy);
+        queryDTO.setPageNum(pageNum);
+        queryDTO.setPageSize(pageSize);
+        return ApiResult.success(subscriptionService.listMySubscriptions(queryDTO));
+    }
+
+    @PostMapping("/api/auth/my-subscriptions/{subscriptionId}/version-decision")
+    public ApiResult<Void> decideVersionAction(@PathVariable Long subscriptionId,
+                                               @RequestBody(required = false) SubscriptionVersionDecisionDTO dto) {
+        subscriptionService.decideVersionAction(subscriptionId, dto == null ? null : dto.getDecision());
+        return ApiResult.success("处理订阅决策成功");
     }
 }

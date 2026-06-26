@@ -8,4 +8,16 @@
         insert into advisor_product_flow_log (product_id, product_version_id, operator_id, action_type, comment)
         values (#{productId}, #{productVersionId}, #{operatorId}, #{actionType}, #{comment})
     </insert>
+
+    <select id="selectByProductId" resultType="com.finance.roboadvisor.product.entity.AdvisorProductFlowLog">
+        select id, product_id as productId, product_version_id as productVersionId,
+               operator_id as operatorId, action_type as actionType, comment, created_at as createdAt
+        from advisor_product_flow_log
+        where product_id = #{productId}
+        order by created_at desc, id desc
+    </select>
+
+    <delete id="deleteByProductId">
+        delete from advisor_product_flow_log where product_id = #{productId}
+    </delete>
 </mapper>

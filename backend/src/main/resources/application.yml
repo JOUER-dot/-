@@ -14,7 +14,7 @@ mybatis:
     map-underscore-to-camel-case: true
 
 jwt:
-  secret: finance-roboadvisor-demo-secret-key-2026-auth-module
+  secret: ${JWT_SECRET:finance-roboadvisor-demo-secret-key-2026-auth-module}
   expiration: 7200000
   header: Authorization
   token-head: "Bearer "

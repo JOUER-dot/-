@@ -3,6 +3,7 @@ package com.finance.roboadvisor.common.exception;
 import com.finance.roboadvisor.common.api.ApiResult;
 import com.finance.roboadvisor.common.api.ResultCode;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -35,6 +36,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ApiResult<Void> handleConstraintViolationException(ConstraintViolationException ex) {
         return ApiResult.failed(ResultCode.VALIDATE_FAILED, ex.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ApiResult<Void> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+        String msg = ex.getMessage();
+        if (msg != null && msg.contains("Duplicate entry")) {
+            return ApiResult.failed(ResultCode.VALIDATE_FAILED, "名称已存在，请使用其他名称");
+        }
+        return ApiResult.failed(ResultCode.VALIDATE_FAILED, "数据冲突，请检查输入");
     }
 
     @ExceptionHandler(Exception.class)

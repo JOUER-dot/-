@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useUserStore } from '@/stores/user'
+import NotificationBell from '@/components/nav/NotificationBell.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,6 +18,10 @@ const handleCommand = async (command: string) => {
     await router.push('/account')
     return
   }
+  if (command === 'notifications') {
+    await router.push('/notifications')
+    return
+  }
   if (command === 'logout') {
     await userStore.logout()
     await router.replace('/login')
@@ -28,14 +33,16 @@ const handleCommand = async (command: string) => {
   <div class="topbar">
     <div class="title">{{ title }}</div>
     <div class="actions">
+      <NotificationBell />
       <el-dropdown @command="handleCommand">
-        <span class="user-entry">
+        <span class="user-entry" style="margin-left: 12px;">
           <el-avatar :size="28">{{ nickname.slice(0, 1) }}</el-avatar>
           <span class="user-name">{{ nickname }}</span>
           <el-tag size="small" effect="plain" class="user-role">{{ roleText }}</el-tag>
         </span>
         <template #dropdown>
           <el-dropdown-menu>
+            <el-dropdown-item command="notifications">消息通知</el-dropdown-item>
             <el-dropdown-item command="account">账号中心</el-dropdown-item>
             <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
           </el-dropdown-menu>

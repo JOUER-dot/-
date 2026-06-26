@@ -8,6 +8,7 @@ import com.finance.roboadvisor.common.exception.BusinessException;
 import com.finance.roboadvisor.product.mapper.ProductComponentMapper;
 import com.finance.roboadvisor.publicapi.mapper.PublicProductMapper;
 import com.finance.roboadvisor.publicapi.service.PublicAdvisorProductService;
+import com.finance.roboadvisor.publicapi.vo.PublicAdvisorVO;
 import com.finance.roboadvisor.publicapi.vo.PublicHoldingSnapshotVO;
 import com.finance.roboadvisor.publicapi.vo.PublicProductDetailVO;
 import com.finance.roboadvisor.publicapi.vo.PublicProductListItemVO;
@@ -40,6 +41,8 @@ public class PublicAdvisorProductServiceImpl implements PublicAdvisorProductServ
     public PageResult<PublicProductListItemVO> listPublishedProducts(String keyword,
                                                                      String type,
                                                                      String riskLevel,
+                                                                     Long creatorId,
+                                                                     String fundCompany,
                                                                      Integer pageNum,
                                                                      Integer pageSize) {
         int safePageNum = pageNum == null || pageNum < 1 ? DEFAULT_PAGE_NUM : pageNum;
@@ -47,19 +50,20 @@ public class PublicAdvisorProductServiceImpl implements PublicAdvisorProductServ
         int offset = (safePageNum - 1) * safePageSize;
 
         List<PublicProductListItemVO> records = publicProductMapper.selectPublishedProducts(
-                trimToNull(keyword),
-                trimToNull(type),
-                trimToNull(riskLevel),
-                offset,
-                safePageSize
+                trimToNull(keyword), trimToNull(type), trimToNull(riskLevel),
+                creatorId, trimToNull(fundCompany), offset, safePageSize
         );
         records.forEach(item -> item.setFeatureTags(splitFeatureTags(item.getFeatureTagsText())));
         Long total = publicProductMapper.countPublishedProducts(
-                trimToNull(keyword),
-                trimToNull(type),
-                trimToNull(riskLevel)
+                trimToNull(keyword), trimToNull(type), trimToNull(riskLevel),
+                creatorId, trimToNull(fundCompany)
         );
         return new PageResult<>(records, total, safePageNum, safePageSize);
+    }
+
+    @Override
+    public List<PublicAdvisorVO> listAdvisors() {
+        return publicProductMapper.selectAdvisorsWithProducts();
     }
 
     @Override

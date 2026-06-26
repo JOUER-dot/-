@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finance.roboadvisor.common.api.ApiResult;
 import com.finance.roboadvisor.common.api.ResultCode;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -28,6 +29,9 @@ import java.util.List;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    @Value("${cors.allowed-origins:http://localhost:8080}")
+    private String allowedOrigins;
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ObjectMapper objectMapper;
@@ -63,8 +67,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/auth/my-subscriptions").hasRole("USER")
                         .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
-                        .requestMatchers("/api/admin/products/**", "/api/admin/funds/**").hasRole("ADVISOR")
+                        .requestMatchers("/api/admin/products/**", "/api/admin/funds/**", "/api/admin/strategy-rules/**", "/api/admin/workbench/**").hasRole("ADVISOR")
+                        .requestMatchers("/api/admin/system/**").hasRole("ADMIN")
                         .requestMatchers("/api/reviewer/**").hasRole("REVIEWER")
+                        .requestMatchers("/api/notifications/**").authenticated()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
@@ -78,7 +84,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:8080"));
+        configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);

@@ -19,4 +19,8 @@
         where r.product_id = #{productId}
         order by r.reviewed_at desc, r.id desc
     </select>
+
+    <delete id="deleteByProductId">
+        delete from advisor_product_review where product_id = #{productId}
+    </delete>
 </mapper>

@@ -1,7 +1,9 @@
 package com.finance.roboadvisor.auth.controller;
 
+import com.finance.roboadvisor.auth.dto.ChangePasswordDTO;
 import com.finance.roboadvisor.auth.dto.LoginDTO;
 import com.finance.roboadvisor.auth.dto.RegisterDTO;
+import com.finance.roboadvisor.auth.dto.UpdateProfileDTO;
 import com.finance.roboadvisor.auth.service.AuthService;
 import com.finance.roboadvisor.auth.vo.CurrentUserVO;
 import com.finance.roboadvisor.auth.vo.LoginVO;
@@ -9,6 +11,7 @@ import com.finance.roboadvisor.common.api.ApiResult;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -43,5 +46,17 @@ public class AuthController {
     public ApiResult<Void> logout() {
         authService.logout();
         return ApiResult.success("退出成功");
+    }
+
+    @PutMapping("/password")
+    public ApiResult<Void> changePassword(@Valid @RequestBody ChangePasswordDTO dto) {
+        authService.changePassword(dto);
+        return ApiResult.success("密码修改成功");
+    }
+
+    @PutMapping("/profile")
+    public ApiResult<Void> updateProfile(@Valid @RequestBody UpdateProfileDTO dto) {
+        authService.updateProfile(dto);
+        return ApiResult.success("个人信息更新成功");
     }
 }

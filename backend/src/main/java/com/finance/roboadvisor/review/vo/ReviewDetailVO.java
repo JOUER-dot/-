@@ -26,6 +26,12 @@ public class ReviewDetailVO {
     private Map<String, Object> params;
     private List<DraftComponentVO> components;
     private List<ReviewRecordVO> reviewSummary;
+    private ReviewVersionSummaryVO baseVersionSummary;
+    private ReviewVersionSummaryVO currentVersionSummary;
+    private List<ReviewDiffFieldVO> fieldDiffs;
+    private List<ReviewDiffComponentVO> componentDiffs;
+    private String changeType;
+    private String versionNote;
     @JsonIgnore
     private String featureTagsText;
     @JsonIgnore
@@ -159,6 +165,54 @@ public class ReviewDetailVO {
 
     public void setReviewSummary(List<ReviewRecordVO> reviewSummary) {
         this.reviewSummary = reviewSummary;
+    }
+
+    public ReviewVersionSummaryVO getBaseVersionSummary() {
+        return baseVersionSummary;
+    }
+
+    public void setBaseVersionSummary(ReviewVersionSummaryVO baseVersionSummary) {
+        this.baseVersionSummary = baseVersionSummary;
+    }
+
+    public ReviewVersionSummaryVO getCurrentVersionSummary() {
+        return currentVersionSummary;
+    }
+
+    public void setCurrentVersionSummary(ReviewVersionSummaryVO currentVersionSummary) {
+        this.currentVersionSummary = currentVersionSummary;
+    }
+
+    public List<ReviewDiffFieldVO> getFieldDiffs() {
+        return fieldDiffs;
+    }
+
+    public void setFieldDiffs(List<ReviewDiffFieldVO> fieldDiffs) {
+        this.fieldDiffs = fieldDiffs;
+    }
+
+    public List<ReviewDiffComponentVO> getComponentDiffs() {
+        return componentDiffs;
+    }
+
+    public void setComponentDiffs(List<ReviewDiffComponentVO> componentDiffs) {
+        this.componentDiffs = componentDiffs;
+    }
+
+    public String getChangeType() {
+        return changeType;
+    }
+
+    public void setChangeType(String changeType) {
+        this.changeType = changeType;
+    }
+
+    public String getVersionNote() {
+        return versionNote;
+    }
+
+    public void setVersionNote(String versionNote) {
+        this.versionNote = versionNote;
     }
 
     public String getFeatureTagsText() {

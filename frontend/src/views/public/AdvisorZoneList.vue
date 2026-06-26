@@ -3,47 +3,84 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import PageContainer from '@/components/ui/PageContainer.vue'
-import SectionCard from '@/components/ui/SectionCard.vue'
-import StatCard from '@/components/ui/StatCard.vue'
-import { getPublishedProductList, type PublicProductListItem } from '@/api/public-product'
-import { formatDecimal, formatPercent, formatText } from '@/utils/format'
+import SkeletonLoader from '@/components/common/SkeletonLoader.vue'
+import { getPublishedProductList, getAdvisorList, type PublicProductListItem, type PublicAdvisorOption } from '@/api/public-product'
+import { formatPercent, formatText } from '@/utils/format'
 import { loadPersisted, savePersisted } from '@/utils/persist'
-import { productTypeLabel, productTypeOptions } from '@/utils/status'
+import { productTypeLabel } from '@/utils/status'
 
 const router = useRouter()
 
 const loading = ref(false)
 const records = ref<PublicProductListItem[]>([])
+const advisors = ref<PublicAdvisorOption[]>([])
+const activeTypeTab = ref('')
+const activeAdvisorId = ref<number | null>(null)
+const sortBy = ref('recommend')
 
-const queryForm = reactive({
-  keyword: '',
-  type: '',
-  riskLevel: ''
-})
-
-const pager = reactive({
-  pageNum: 1,
-  pageSize: 10,
-  total: 0
-})
-
+const queryForm = reactive({ keyword: '', type: '', riskLevel: '', creatorId: undefined as number | undefined, fundCompany: '' })
+const pager = reactive({ pageNum: 1, pageSize: 12, total: 0 })
 const storageKey = 'roboadvisor:public-zone:query'
 
-const typeOptions = productTypeOptions()
+const typeOptions = [
+  { label: '全部产品', value: '' },
+  { label: '策略组合', value: 'STRATEGY' },
+  { label: 'FOF组合', value: 'FOF' }
+]
 const riskOptions = ['R1', 'R2', 'R3', 'R4', 'R5']
+const sortOptions = [
+  { label: '推荐排序', value: 'recommend' },
+  { label: '风险从低到高', value: 'risk_asc' },
+  { label: '风险从高到低', value: 'risk_desc' }
+]
 
-const quickTypeOptions = computed(() => [{ label: '全部', value: '' }, ...typeOptions])
-
-const summaryCards = computed(() => {
-  const productCount = records.value.length
-  const highRiskCount = records.value.filter((item) => ['R4', 'R5'].includes(item.riskLevel)).length
-  const navCount = records.value.filter((item) => item.latestNav !== undefined && item.latestNav !== null).length
-  return [
-    { label: '当前页产品数', value: String(productCount), hint: '' },
-    { label: '高风险产品数', value: String(highRiskCount), hint: '' },
-    { label: '有净值数据产品', value: String(navCount), hint: '' }
-  ]
+const advisorOptions = computed(() => {
+  return [{ id: 0, name: '全部投顾' } as PublicAdvisorOption, ...advisors.value]
 })
+
+const sortedRecords = computed(() => {
+  const list = [...records.value]
+  if (sortBy.value === 'risk_asc') list.sort((a, b) => a.riskLevel.localeCompare(b.riskLevel))
+  else if (sortBy.value === 'risk_desc') list.sort((a, b) => b.riskLevel.localeCompare(a.riskLevel))
+  return list
+})
+
+const handleTypeTabChange = (type: string) => {
+  activeTypeTab.value = type
+  queryForm.type = type
+  handleSearch()
+}
+
+const handleAdvisorChange = (id: number) => {
+  activeAdvisorId.value = id
+  queryForm.creatorId = id || undefined
+  handleSearch()
+}
+
+const handleSearch = async () => {
+  pager.pageNum = 1
+  loading.value = true
+  try {
+    const data = await getPublishedProductList({
+      keyword: queryForm.keyword || undefined,
+      type: queryForm.type || undefined,
+      riskLevel: queryForm.riskLevel || undefined,
+      creatorId: queryForm.creatorId || undefined,
+      fundCompany: queryForm.fundCompany || undefined,
+      pageNum: pager.pageNum,
+      pageSize: pager.pageSize
+    })
+    records.value = data.records
+    pager.total = data.total
+  } finally { loading.value = false }
+}
+
+const handleReset = async () => {
+  queryForm.keyword = ''; queryForm.type = ''; queryForm.riskLevel = ''
+  queryForm.creatorId = undefined; queryForm.fundCompany = ''
+  activeTypeTab.value = ''; activeAdvisorId.value = null
+  pager.pageNum = 1; await loadData()
+}
 
 const loadData = async () => {
   loading.value = true
@@ -52,353 +89,220 @@ const loadData = async () => {
       keyword: queryForm.keyword || undefined,
       type: queryForm.type || undefined,
       riskLevel: queryForm.riskLevel || undefined,
+      creatorId: queryForm.creatorId || undefined,
+      fundCompany: queryForm.fundCompany || undefined,
       pageNum: pager.pageNum,
       pageSize: pager.pageSize
     })
     records.value = data.records
     pager.total = data.total
-  } finally {
-    loading.value = false
-  }
+  } finally { loading.value = false }
 }
 
-const handleSearch = async () => {
-  pager.pageNum = 1
-  await loadData()
-}
-
-const handleReset = async () => {
-  queryForm.keyword = ''
-  queryForm.type = ''
-  queryForm.riskLevel = ''
-  pager.pageNum = 1
-  await loadData()
-}
-
-const handleQuickType = async (value: string) => {
-  queryForm.type = value
-  await handleSearch()
-}
-
-onMounted(() => {
+onMounted(async () => {
   const persisted = loadPersisted<{ query: typeof queryForm; pageSize: number }>(storageKey, {
-    query: { keyword: '', type: '', riskLevel: '' },
-    pageSize: 10
+    query: { keyword: '', type: '', riskLevel: '', creatorId: undefined, fundCompany: '' }, pageSize: 12
   })
   Object.assign(queryForm, persisted.query)
-  pager.pageSize = persisted.pageSize || 10
-  void loadData()
+  if (queryForm.type) activeTypeTab.value = queryForm.type
+  if (queryForm.creatorId) activeAdvisorId.value = queryForm.creatorId
+  pager.pageSize = persisted.pageSize || 12
+  await Promise.all([getAdvisorList().then(d => advisors.value = d).catch(() => {}), loadData()])
 })
 
-watch(
-  () => ({ query: { ...queryForm }, pageSize: pager.pageSize }),
-  (value) => savePersisted(storageKey, value),
-  { deep: true }
-)
+watch(() => ({ query: { ...queryForm }, pageSize: pager.pageSize }), (v) => savePersisted(storageKey, v), { deep: true })
 </script>
 
 <template>
   <PageContainer>
-    <div class="hero">
-      <div class="hero__left">
-        <div class="hero__kicker">产品专区</div>
-        <div class="hero__title">只展示已上架版本，浏览无需登录</div>
+    <div class="product-zone">
+      <!-- Hero -->
+      <div class="zone-hero">
+        <div class="zone-hero__text">
+          <div class="zone-hero__kicker">基金投顾</div>
+          <div class="zone-hero__title">产品中心</div>
+          <div class="zone-hero__desc">浏览投顾精选产品，查看详情后即可订阅</div>
+        </div>
+        <div class="zone-hero__search">
+          <el-input v-model="queryForm.keyword" clearable placeholder="搜索产品名称或策略编码..." style="width:300px" @keyup.enter="handleSearch">
+            <template #prefix><el-icon><search /></el-icon></template>
+          </el-input>
+        </div>
       </div>
-      <div class="hero__right">
-        <el-button @click="handleReset">重置筛选</el-button>
-      </div>
-    </div>
 
-    <div class="stat-grid">
-      <StatCard
-        v-for="item in summaryCards"
-        :key="item.label"
-        :label="item.label"
-        :value="item.value"
-        :hint="item.hint"
-      />
-    </div>
-
-    <SectionCard title="快捷筛选" subtitle="按产品类型快速过滤">
-      <div class="quick-row">
-        <div class="quick-label">产品类型</div>
-        <el-space wrap>
-          <el-button
-            v-for="item in quickTypeOptions"
-            :key="item.value"
-            size="small"
-            :type="queryForm.type === item.value ? 'primary' : undefined"
-            :plain="queryForm.type !== item.value"
-            @click="handleQuickType(item.value)"
-          >
-            {{ item.label }}
-          </el-button>
-        </el-space>
-      </div>
-    </SectionCard>
-
-    <SectionCard title="筛选条件">
-      <el-form :inline="true" :model="queryForm">
-        <el-form-item label="关键字">
-          <el-input v-model="queryForm.keyword" clearable placeholder="产品名称或策略编码" @keyup.enter="handleSearch" />
-        </el-form-item>
-        <el-form-item label="产品类型">
-          <el-select v-model="queryForm.type" clearable placeholder="全部">
-            <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value" />
+      <!-- 统一工具条 -->
+      <div class="zone-toolbar">
+        <div class="toolbar-left">
+          <el-select v-model="activeTypeTab" size="small" style="width:110px" @change="handleTypeTabChange">
+            <el-option v-for="tab in typeOptions" :key="tab.value" :label="tab.label" :value="tab.value" />
           </el-select>
-        </el-form-item>
-        <el-form-item label="风险等级">
-          <el-select v-model="queryForm.riskLevel" clearable placeholder="全部">
-            <el-option v-for="item in riskOptions" :key="item" :label="item" :value="item" />
+          <el-select v-model="activeAdvisorId" size="small" style="width:120px" placeholder="全部投顾" clearable @change="handleAdvisorChange">
+            <el-option v-for="adv in advisors" :key="adv.id" :label="adv.name" :value="adv.id" />
           </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </SectionCard>
+          <el-select v-model="queryForm.riskLevel" size="small" style="width:105px" clearable placeholder="风险等级">
+            <el-option v-for="r in riskOptions" :key="r" :label="r" :value="r" />
+          </el-select>
+          <el-select v-model="sortBy" size="small" style="width:110px">
+            <el-option v-for="opt in sortOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+        </div>
+        <div class="toolbar-right">
+          <el-button size="small" type="primary" @click="handleSearch">查询</el-button>
+          <el-button size="small" @click="handleReset">重置</el-button>
+          <span class="filter-count">共 {{ pager.total }} 个产品</span>
+        </div>
+      </div>
 
-    <div v-loading="loading" class="list-wrap">
-      <el-empty v-if="records.length === 0" description="暂无产品" />
-      <el-row v-else :gutter="16">
-        <el-col v-for="item in records" :key="item.id" :xs="24" :sm="12" :lg="8">
-          <el-card shadow="hover" class="product-card" @click="router.push(`/advisor-zone/${item.id}`)">
-            <div class="product-card__top">
-              <div class="product-card__head">
-                <h3>{{ item.name }}</h3>
-              </div>
-              <div class="product-card__tags">
-                <el-tag effect="dark">{{ item.riskLevel }}</el-tag>
-                <el-tag effect="plain">{{ productTypeLabel(item.type) }}</el-tag>
-              </div>
+      <!-- 产品列表 -->
+      <SkeletonLoader v-if="loading && records.length === 0" type="card" :rows="6" />
+      <div v-else class="product-grid">
+        <el-empty v-if="!loading && records.length === 0" description="暂无产品" />
+        <div v-for="item in sortedRecords" :key="item.id" class="product-card" @click="router.push(`/advisor-zone/${item.id}`)">
+          <div class="card-header">
+            <div class="card-title">{{ item.name }}</div>
+            <div class="card-badges">
+              <span class="badge-risk" :class="`risk-${item.riskLevel.toLowerCase()}`">{{ item.riskLevel }}</span>
+              <span class="badge-type">{{ productTypeLabel(item.type) }}</span>
             </div>
+          </div>
 
-            <div class="product-meta">
-              <div class="meta-item">
-                <span class="meta-label">策略编码</span>
-                <strong>{{ formatText(item.strategyCode) }}</strong>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">产品定位</span>
-                <strong>{{ item.riskLevel }} / {{ productTypeLabel(item.type) }}</strong>
-              </div>
+          <div class="card-meta">
+            <div class="card-meta__item">
+              <span class="card-meta__label">投顾</span>
+              <span class="card-meta__value">{{ formatText(item.creatorName) || '-' }}</span>
             </div>
-
-            <div class="tag-list">
-              <el-tag v-for="tag in item.featureTags" :key="tag" effect="plain" size="small">
-                {{ tag }}
-              </el-tag>
-              <span v-if="item.featureTags.length === 0" class="muted-text">暂无标签</span>
+            <div class="card-meta__item">
+              <span class="card-meta__label">策略</span>
+              <span class="card-meta__value">{{ formatText(item.strategyCode) || '-' }}</span>
             </div>
-
-            <div class="nav-summary">
-              <div class="nav-block">
-                <span class="nav-label">最新净值</span>
-                <strong>{{ formatDecimal(item.latestNav) }}</strong>
-              </div>
-              <div class="nav-block nav-block--positive">
-                <span class="nav-label">累计收益</span>
-                <strong>{{ formatPercent(item.latestCumReturn) }}</strong>
-              </div>
+            <div class="card-meta__item card-meta__item--highlight">
+              <span class="card-meta__label">累计收益</span>
+              <span class="card-meta__value" :class="Number(item.latestCumReturn) >= 0 ? 'positive' : 'negative'">
+                {{ formatPercent(item.latestCumReturn) }}
+              </span>
             </div>
+          </div>
 
-            <div class="product-card__footer">
-              <span class="muted-text">{{ item.strategyCode ? formatText(item.strategyCode) : '' }}</span>
-              <el-button type="primary" link @click.stop="router.push(`/advisor-zone/${item.id}`)">查看详情</el-button>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-    </div>
+          <div class="card-funds" v-if="item.fundCompanies?.length">
+            基金公司：<span v-for="(fc, i) in item.fundCompanies" :key="fc">{{ i > 0 ? ' · ' : '' }}{{ fc }}</span>
+          </div>
 
-    <SectionCard>
+          <div class="card-tags" v-if="item.featureTags?.length">
+            <el-tag v-for="tag in item.featureTags.slice(0, 3)" :key="tag" effect="plain" size="small">{{ tag }}</el-tag>
+          </div>
+
+          <div class="card-footer">
+            <span class="card-footer__hint">点击查看详情 →</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分页 -->
       <div class="pagination-bar">
-        <el-pagination
-          background
-          layout="total, sizes, prev, pager, next"
-          :current-page="pager.pageNum"
-          :page-size="pager.pageSize"
-          :page-sizes="[10, 20, 50]"
-          :total="pager.total"
-          @current-change="
-            (page: number) => {
-              pager.pageNum = page
-              loadData()
-            }
-          "
-          @size-change="
-            (size: number) => {
-              pager.pageSize = size
-              pager.pageNum = 1
-              loadData()
-            }
-          "
-        />
+        <el-pagination background layout="total, prev, pager, next"
+          :current-page="pager.pageNum" :page-size="pager.pageSize" :total="pager.total"
+          @current-change="(p: number) => { pager.pageNum = p; loadData() }" />
       </div>
-    </SectionCard>
+    </div>
   </PageContainer>
 </template>
 
 <style scoped>
-.hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px;
-  border-radius: var(--radius-card);
+.product-zone { display: flex; flex-direction: column; gap: 16px; }
+
+.zone-hero {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 24px; border-radius: var(--radius-card);
   border: 1px solid var(--color-border);
-  background:
-    radial-gradient(680px 220px at 20% 20%, rgba(22, 59, 102, 0.12), transparent 60%),
-    radial-gradient(520px 240px at 90% 10%, rgba(15, 157, 138, 0.09), transparent 56%),
-    linear-gradient(180deg, var(--color-bg-card) 0%, #f8fafc 100%);
-  margin-bottom: 16px;
+  background: radial-gradient(640px 180px at 18% 18%, rgba(22,59,102,.1), transparent 60%),
+              linear-gradient(180deg, var(--color-bg-card) 0%, #f8fafc 100%);
+  box-shadow: var(--shadow-soft);
+}
+.zone-hero__kicker { font-size: 12px; color: var(--color-text-2); letter-spacing: .4px; }
+.zone-hero__title { margin-top: 6px; font-size: 26px; font-weight: 900; color: var(--color-text-1); }
+.zone-hero__desc { margin-top: 4px; font-size: 13px; color: var(--color-text-2); }
+
+.zone-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-card);
+}
+.toolbar-left {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.toolbar-right {
+  display: flex; align-items: center; gap: 8px;
+}
+.filter-count { font-size: 12px; color: var(--color-text-3); white-space: nowrap; }
+
+.card-funds {
+  font-size: 12px; color: var(--color-text-3);
+  padding: 4px 0;
 }
 
-.hero__kicker {
-  font-size: 12px;
-  letter-spacing: 0.4px;
-  color: var(--color-text-2);
+.zone-filter {
+  display: flex; align-items: center; gap: 8px;
 }
+.filter-count { margin-left: auto; font-size: 12px; color: var(--color-text-3); }
 
-.hero__title {
-  margin-top: 10px;
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 900;
-  color: var(--color-text-1);
-}
-
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.quick-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.quick-label {
-  font-weight: 700;
-  color: var(--color-text-1);
-  white-space: nowrap;
-}
-
-.list-wrap {
-  margin: 16px 0;
+.product-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px;
 }
 
 .product-card {
-  margin-bottom: 16px;
-  cursor: pointer;
-  border-radius: var(--radius-card);
-  border: 1px solid var(--color-border);
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 20px; border: 1px solid var(--color-border); border-radius: var(--radius-card);
+  background: var(--color-bg-card); cursor: pointer;
+  transition: all .25s;
+}
+.product-card:hover {
+  border-color: var(--color-primary); box-shadow: 0 8px 24px rgba(22,59,102,.1);
+  transform: translateY(-2px);
 }
 
-.product-card__top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+.card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.card-title { font-size: 17px; font-weight: 700; color: var(--color-text-1); line-height: 1.3; }
+.card-badges { display: flex; gap: 6px; flex-shrink: 0; }
+.badge-risk {
+  padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 700;
+  color: #fff;
+}
+.badge-risk.risk-r1 { background: #1e9e62; }
+.badge-risk.risk-r2 { background: #2f6bde; }
+.badge-risk.risk-r3 { background: #d89b2b; }
+.badge-risk.risk-r4 { background: #e67e22; }
+.badge-risk.risk-r5 { background: #c53b32; }
+.badge-type {
+  padding: 2px 10px; border-radius: 10px; font-size: 11px;
+  border: 1px solid var(--color-border-strong); color: var(--color-text-2);
 }
 
-.product-card__head h3 {
-  margin: 0;
-  font-size: 18px;
-  color: var(--color-text-1);
+.card-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.card-meta__item {
+  padding: 10px; border-radius: 10px; background: var(--color-bg-muted);
+  display: flex; flex-direction: column; gap: 4px;
 }
+.card-meta__item--highlight { background: var(--brand-50); }
+.card-meta__label { font-size: 11px; color: var(--color-text-3); }
+.card-meta__value { font-size: 14px; font-weight: 700; color: var(--color-text-1); }
+.card-meta__value.positive { color: var(--success-600); }
+.card-meta__value.negative { color: var(--danger-600); }
 
-.product-card__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+.card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 
-.product-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
-}
+.card-footer { display: flex; justify-content: flex-end; }
+.card-footer__hint { font-size: 12px; color: var(--color-text-3); }
 
-.meta-item {
-  padding: 12px;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 12px;
-}
-
-.meta-label {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--color-text-2);
-  font-size: 12px;
-}
-
-.meta-item strong {
-  color: var(--color-text-1);
-}
-
-.tag-list {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.nav-summary {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.nav-block {
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(22, 59, 102, 0.12);
-  background: linear-gradient(180deg, rgba(22, 59, 102, 0.08) 0%, rgba(255, 255, 255, 0.9) 100%);
-}
-
-.nav-block--positive {
-  border-color: rgba(15, 157, 138, 0.16);
-  background: linear-gradient(180deg, rgba(15, 157, 138, 0.1) 0%, rgba(255, 255, 255, 0.92) 100%);
-}
-
-.nav-label {
-  color: var(--color-text-2);
-  font-size: 13px;
-}
-
-.nav-summary strong {
-  display: block;
-  margin-top: 6px;
-  font-size: 18px;
-  color: var(--color-text-1);
-}
-
-.product-card__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-}
+.pagination-bar { display: flex; justify-content: center; margin-top: 8px; }
 
 @media (max-width: 768px) {
-  .product-meta,
-  .nav-summary {
-    grid-template-columns: 1fr;
-  }
+  .zone-hero { flex-direction: column; align-items: stretch; }
+  .zone-hero__search :deep(.el-input) { width: 100% !important; }
+  .zone-toolbar { flex-direction: column; align-items: stretch; }
+  .product-grid { grid-template-columns: 1fr; }
+  .card-meta { grid-template-columns: 1fr; }
 }
 </style>

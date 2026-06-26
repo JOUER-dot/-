@@ -1,20 +1,42 @@
 :root {
   --el-color-primary: var(--color-primary);
+  --el-color-primary-light-3: var(--brand-500);
+  --el-color-primary-light-5: #4d7fb3;
+  --el-color-primary-light-7: #90b2d2;
+  --el-color-primary-light-8: #c3d7ea;
+  --el-color-primary-light-9: var(--brand-50);
+  --el-color-primary-dark-2: var(--brand-700);
+
   --el-color-success: var(--color-success);
+  --el-color-success-light-9: var(--success-50);
   --el-color-warning: var(--color-warning);
+  --el-color-warning-light-9: var(--warning-50);
   --el-color-danger: var(--color-danger);
+  --el-color-danger-light-9: var(--danger-50);
+  --el-color-info: var(--info-500);
+  --el-color-info-light-9: var(--info-50);
 
   --el-border-color: var(--color-border);
-  --el-border-color-light: var(--color-border);
+  --el-border-color-light: #edf1f5;
+  --el-border-color-lighter: #f3f5f8;
+  --el-border-color-dark: var(--color-border-strong);
 
   --el-text-color-primary: var(--color-text-1);
   --el-text-color-regular: var(--color-text-2);
   --el-text-color-secondary: var(--color-text-3);
+  --el-text-color-placeholder: var(--color-text-3);
 
   --el-border-radius-base: var(--radius-btn);
+  --el-border-radius-small: 8px;
+  --el-border-radius-round: var(--radius-pill);
   --el-box-shadow: var(--shadow-soft);
   --el-box-shadow-light: var(--shadow-soft);
   --el-box-shadow-lighter: var(--shadow-soft);
+  --el-fill-color-blank: var(--color-bg-card);
+  --el-fill-color-light: var(--color-bg-muted);
+  --el-bg-color: var(--color-bg-card);
+  --el-bg-color-page: var(--color-bg-page);
+  --el-mask-color-extra-light: rgba(23, 32, 45, 0.45);
 }
 
 body {
@@ -24,9 +46,31 @@ body {
 
 .section-card {
   border-radius: var(--radius-card);
-  box-shadow: none;
+  box-shadow: var(--shadow-soft);
 }
 
 .muted-text {
   color: var(--color-text-3);
+}
+
+.el-button {
+  font-weight: 600;
+}
+
+.el-button--primary {
+  box-shadow: 0 8px 18px rgba(18, 59, 109, 0.14);
+}
+
+.el-card {
+  border-color: var(--color-border);
+}
+
+.el-table {
+  --el-table-header-bg-color: #f8fafc;
+  --el-table-tr-bg-color: var(--color-bg-card);
+  --el-table-row-hover-bg-color: #f7fafd;
+}
+
+.el-tag {
+  font-weight: 600;
 }

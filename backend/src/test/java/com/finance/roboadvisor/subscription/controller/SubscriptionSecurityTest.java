@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -52,5 +53,15 @@ class SubscriptionSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         verify(subscriptionService, never()).unsubscribe(1L);
+    }
+
+    @Test
+    void versionDecision_shouldReturnUnauthorizedWhenNotLoggedIn() throws Exception {
+        mockMvc.perform(post("/api/auth/my-subscriptions/10/version-decision")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"CONFIRM\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(subscriptionService, never()).decideVersionAction(10L, "CONFIRM");
     }
 }

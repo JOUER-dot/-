@@ -48,7 +48,7 @@ const featureTagOptions = ['固收增强', '权益增强', '低波动', '长期�
             <el-input v-model="formModel.name" :disabled="readOnly" maxlength="100" />
           </el-form-item>
         </el-col>
-        <el-col :span="12">
+        <el-col :span="8">
           <el-form-item label="产品类型" required>
             <el-select v-model="formModel.type" :disabled="readOnly" placeholder="请选择产品类型">
               <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value" />

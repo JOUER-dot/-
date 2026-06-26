@@ -15,6 +15,8 @@ public class PublicProductListItemVO {
     private List<String> featureTags;
     private BigDecimal latestNav;
     private BigDecimal latestCumReturn;
+    private String creatorName;
+    private String fundCompaniesText;
     @JsonIgnore
     private String featureTagsText;
 
@@ -80,6 +82,30 @@ public class PublicProductListItemVO {
 
     public void setLatestCumReturn(BigDecimal latestCumReturn) {
         this.latestCumReturn = latestCumReturn;
+    }
+
+    public String getCreatorName() {
+        return creatorName;
+    }
+
+    public void setCreatorName(String creatorName) {
+        this.creatorName = creatorName;
+    }
+
+    public String getFundCompaniesText() {
+        return fundCompaniesText;
+    }
+
+    public void setFundCompaniesText(String fundCompaniesText) {
+        this.fundCompaniesText = fundCompaniesText;
+    }
+
+    public List<String> getFundCompanies() {
+        if (fundCompaniesText == null || fundCompaniesText.isBlank()) return List.of();
+        return java.util.Arrays.stream(fundCompaniesText.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
     }
 
     public String getFeatureTagsText() {

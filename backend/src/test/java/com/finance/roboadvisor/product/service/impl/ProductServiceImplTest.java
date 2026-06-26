@@ -7,8 +7,10 @@ import com.finance.roboadvisor.common.api.ResultCode;
 import com.finance.roboadvisor.common.exception.BusinessException;
 import com.finance.roboadvisor.fund.mapper.FundMapper;
 import com.finance.roboadvisor.fund.vo.FundOptionVO;
+import com.finance.roboadvisor.product.dto.ProductSubmitDTO;
 import com.finance.roboadvisor.product.entity.AdvisorProduct;
 import com.finance.roboadvisor.product.entity.AdvisorProductDraft;
+import com.finance.roboadvisor.product.entity.AdvisorProductVersion;
 import com.finance.roboadvisor.product.mapper.ProductComponentMapper;
 import com.finance.roboadvisor.product.mapper.ProductDraftComponentMapper;
 import com.finance.roboadvisor.product.mapper.ProductDraftMapper;
@@ -33,6 +35,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -202,8 +205,62 @@ class ProductServiceImplTest {
                 .when(strategyRuleValidationService)
                 .validateOrThrow(eq("BALANCE_ALPHA"), eq("STRATEGY"), anyList(), isNull());
 
-        assertThatThrownBy(() -> productService.submitProduct(1L))
+        assertThatThrownBy(() -> productService.submitProduct(1L, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("策略规则校验失败：单基金权重超出限制");
+    }
+
+    @Test
+    void submitPublishedProductShouldCreateNewSubmittedVersionWithBaseVersion() {
+        AdvisorProduct product = new AdvisorProduct();
+        product.setId(8L);
+        product.setCreatorId(2L);
+        product.setStatus("PUBLISHED");
+        product.setCurrentVersionNo(3);
+        product.setPublishedVersionNo(3);
+        product.setName("稳健组合");
+        product.setType("STRATEGY");
+        product.setRiskLevel("MEDIUM");
+        product.setStrategyCode("BALANCE_ALPHA");
+        when(productMapper.selectById(8L)).thenReturn(product);
+
+        AdvisorProductDraft draft = new AdvisorProductDraft();
+        draft.setId(80L);
+        draft.setProductId(8L);
+        draft.setBaseInfoJson("{\"investmentHorizon\":\"LONG\"}");
+        draft.setParamsJson("{\"rebalance\":\"MONTHLY\"}");
+        when(productDraftMapper.selectByProductId(8L)).thenReturn(draft);
+
+        DraftComponentVO component = new DraftComponentVO();
+        component.setFundId(100L);
+        component.setFundCode("110022");
+        component.setFundName("易方达消费行业股票");
+        component.setWeight(new BigDecimal("1.0000"));
+        when(productDraftComponentMapper.selectByDraftId(80L)).thenReturn(List.of(component));
+
+        FundOptionVO fund = new FundOptionVO();
+        fund.setId(100L);
+        fund.setFundCode("110022");
+        fund.setFundName("易方达消费行业股票");
+        when(fundMapper.selectEnabledFundsByIds(List.of(100L))).thenReturn(List.of(fund));
+
+        AdvisorProductVersion baseVersion = new AdvisorProductVersion();
+        baseVersion.setId(300L);
+        baseVersion.setVersionNo(3);
+        when(productVersionMapper.selectLatestDraftOrSubmittedByProductId(8L)).thenReturn(null);
+        when(productVersionMapper.selectLatestPublishedByProductId(8L)).thenReturn(baseVersion);
+
+        ProductSubmitDTO dto = new ProductSubmitDTO();
+        dto.setChangeType("MAJOR");
+        dto.setVersionNote(" 调仓并提升风险等级 ");
+
+        productService.submitProduct(8L, dto);
+
+        verify(productVersionMapper).insert(argThat(version ->
+                "MAJOR".equals(version.getChangeType())
+                        && Long.valueOf(300L).equals(version.getBaseVersionId())
+                        && "调仓并提升风险等级".equals(version.getVersionNote())
+                        && "SUBMITTED".equals(version.getVersionStatus())
+                        && Integer.valueOf(4).equals(version.getVersionNo())));
     }
 }

@@ -7,7 +7,7 @@ import { useUserStore } from '@/stores/user'
 type MenuItem = {
   label: string
   path: string
-  group: 'COMMON' | 'USER' | 'ADVISOR' | 'REVIEWER'
+  group: 'COMMON' | 'USER' | 'ADVISOR' | 'REVIEWER' | 'ADMIN'
   roles?: string[]
 }
 
@@ -16,13 +16,16 @@ const route = useRoute()
 const userStore = useUserStore()
 
 const allMenus: MenuItem[] = [
-  { label: '工作台', path: '/dashboard', group: 'COMMON', roles: ['USER', 'ADVISOR', 'REVIEWER'] },
-  { label: '账号中心', path: '/account', group: 'COMMON', roles: ['USER', 'ADVISOR', 'REVIEWER'] },
-  { label: '产品专区', path: '/advisor-zone', group: 'USER', roles: ['USER'] },
+  { label: '工作台', path: '/admin/products', group: 'ADVISOR', roles: ['ADVISOR'] },
+  { label: '创建产品', path: '/admin/products/create', group: 'ADVISOR', roles: ['ADVISOR'] },
+  { label: '工作台', path: '/review/pending', group: 'REVIEWER', roles: ['REVIEWER'] },
+  { label: '我的审核记录', path: '/review/my-history', group: 'REVIEWER', roles: ['REVIEWER'] },
+  { label: '工作台', path: '/my/dashboard', group: 'USER', roles: ['USER'] },
   { label: '我的订阅', path: '/my-subscriptions', group: 'USER', roles: ['USER'] },
-  { label: '组合产品', path: '/admin/products', group: 'ADVISOR', roles: ['ADVISOR'] },
-  { label: '新建产品', path: '/admin/products/create', group: 'ADVISOR', roles: ['ADVISOR'] },
-  { label: '待审列表', path: '/review/pending', group: 'REVIEWER', roles: ['REVIEWER'] }
+  { label: '管理后台', path: '/admin/dashboard', group: 'ADMIN', roles: ['ADMIN'] },
+  { label: '用户管理', path: '/admin/users', group: 'ADMIN', roles: ['ADMIN'] },
+  { label: '账号中心', path: '/account', group: 'COMMON', roles: ['USER', 'ADVISOR', 'REVIEWER', 'ADMIN'] },
+  { label: '通知中心', path: '/notifications', group: 'COMMON', roles: ['USER', 'ADVISOR', 'REVIEWER', 'ADMIN'] }
 ]
 
 const menus = computed(() => allMenus.filter((item) => !item.roles || userStore.hasAnyRole(item.roles)))

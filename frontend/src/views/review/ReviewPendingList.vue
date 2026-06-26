@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import PageHeader from '@/components/common/PageHeader.vue'
 import PageContainer from '@/components/ui/PageContainer.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
-import { getPendingReviewList, type ReviewPendingItem } from '@/api/review'
+import { getPendingReviewList, batchApproveReviews, batchRejectReviews, type ReviewPendingItem } from '@/api/review'
 import { formatText } from '@/utils/format'
 import { loadPersisted, savePersisted } from '@/utils/persist'
 import { productTypeLabel, productTypeOptions } from '@/utils/status'
@@ -15,6 +16,9 @@ const router = useRouter()
 
 const loading = ref(false)
 const records = ref<ReviewPendingItem[]>([])
+const selectedRows = ref<ReviewPendingItem[]>([])
+const rejectDialogVisible = ref(false)
+const rejectBatchComment = ref('')
 
 const queryForm = reactive({
   keyword: '',
@@ -35,14 +39,29 @@ const riskOptions = ['R1', 'R2', 'R3', 'R4', 'R5']
 
 const quickTypeOptions = computed(() => [{ label: '全部', value: '' }, ...typeOptions])
 
+const selectedIds = computed(() => selectedRows.value.map((item) => item.id))
+const hasSelection = computed(() => selectedRows.value.length > 0)
+
+const isVersionIteration = (item: ReviewPendingItem) => item.baseVersionNo !== null && item.baseVersionNo !== undefined
+
+const changeTypeTag = (item: ReviewPendingItem) => {
+  if (item.changeType === 'MAJOR') {
+    return { type: 'danger' as const, label: '重大变更' }
+  }
+  if (item.changeType === 'NORMAL') {
+    return { type: 'info' as const, label: '普通变更' }
+  }
+  return null
+}
+
 const summaryCards = computed(() => {
   const total = records.value.length
-  const highRiskCount = records.value.filter((item) => ['R4', 'R5'].includes(item.riskLevel)).length
-  const strategyCount = records.value.filter((item) => item.type === 'STRATEGY').length
+  const iterationCount = records.value.filter((item) => isVersionIteration(item)).length
+  const majorChangeCount = records.value.filter((item) => item.changeType === 'MAJOR').length
   return [
     { label: '待审数', value: String(total), hint: '' },
-    { label: '高风险', value: String(highRiskCount), hint: '' },
-    { label: '策略组合', value: String(strategyCount), hint: '' }
+    { label: '版本迭代', value: String(iterationCount), hint: '' },
+    { label: '重大变更', value: String(majorChangeCount), hint: '' }
   ]
 })
 
@@ -58,6 +77,7 @@ const loadData = async () => {
     })
     records.value = data.records
     pager.total = data.total
+    selectedRows.value = []
   } finally {
     loading.value = false
   }
@@ -79,6 +99,53 @@ const handleReset = async () => {
 const handleQuickType = async (value: string) => {
   queryForm.type = value
   await handleSearch()
+}
+
+const handleBatchApprove = async () => {
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先选择产品')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`确认通过选中的 ${selectedIds.value.length} 个产品吗？`, '批量审核通过', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await batchApproveReviews(selectedIds.value)
+    ElMessage.success(`已通过 ${selectedIds.value.length} 个产品`)
+    await loadData()
+  } catch {
+    ElMessage.error('批量通过失败')
+  }
+}
+
+const handleBatchReject = async () => {
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先选择产品')
+    return
+  }
+  rejectBatchComment.value = ''
+  rejectDialogVisible.value = true
+}
+
+const confirmBatchReject = async () => {
+  if (!rejectBatchComment.value.trim()) {
+    ElMessage.warning('请填写驳回意见')
+    return
+  }
+  rejectDialogVisible.value = false
+  try {
+    await batchRejectReviews(selectedIds.value, { comment: rejectBatchComment.value })
+    ElMessage.success(`已驳回 ${selectedIds.value.length} 个产品`)
+    await loadData()
+  } catch {
+    ElMessage.error('批量驳回失败')
+  }
+}
+
+const handleSelectionChange = (rows: ReviewPendingItem[]) => {
+  selectedRows.value = rows
 }
 
 onMounted(() => {
@@ -169,7 +236,16 @@ watch(
       </SectionCard>
 
       <SectionCard title="待审产品" class="table-section">
-        <el-table v-loading="loading" :data="records" border>
+        <div v-if="hasSelection" class="batch-bar">
+          <div class="batch-bar__summary">已选择 {{ selectedIds.length }} 项</div>
+          <div class="batch-bar__actions">
+            <el-button type="success" @click="handleBatchApprove">批量通过</el-button>
+            <el-button type="danger" plain @click="handleBatchReject">批量驳回</el-button>
+          </div>
+        </div>
+
+        <el-table v-loading="loading" :data="records" border @selection-change="handleSelectionChange">
+          <el-table-column type="selection" width="46" />
           <el-table-column label="产品" min-width="260">
             <template #default="{ row }">
               <div class="name-cell">
@@ -178,11 +254,17 @@ watch(
                   <span>{{ productTypeLabel(row.type) }}</span>
                   <span>风险 {{ row.riskLevel }}</span>
                   <span>版本 V{{ row.versionNo }}</span>
+                  <span v-if="isVersionIteration(row)">基线 V{{ row.baseVersionNo }}</span>
                   <span>提交 {{ formatText(row.submittedAt) }}</span>
                 </div>
-                <div v-if="row.featureTags?.length" class="name-cell__tags">
+                <div v-if="row.featureTags?.length || isVersionIteration(row) || changeTypeTag(row)" class="name-cell__tags">
+                  <el-tag v-if="isVersionIteration(row)" effect="plain" size="small">版本迭代</el-tag>
+                  <el-tag v-if="changeTypeTag(row)" :type="changeTypeTag(row)?.type" effect="plain" size="small">
+                    {{ changeTypeTag(row)?.label }}
+                  </el-tag>
                   <el-tag v-for="tag in row.featureTags" :key="tag" effect="plain" size="small">{{ tag }}</el-tag>
                 </div>
+                <div v-if="row.versionNote" class="name-cell__note">版本摘要：{{ row.versionNote }}</div>
               </div>
             </template>
           </el-table-column>
@@ -230,6 +312,23 @@ watch(
           />
         </div>
       </SectionCard>
+
+      <el-dialog v-model="rejectDialogVisible" title="批量驳回" width="480px">
+        <el-form>
+          <el-form-item label="驳回意见">
+            <el-input
+              v-model="rejectBatchComment"
+              type="textarea"
+              :rows="4"
+              placeholder="请输入统一的驳回意见，将应用到所有选中的产品"
+            />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="rejectDialogVisible = false">取消</el-button>
+          <el-button type="danger" @click="confirmBatchReject">确认驳回</el-button>
+        </template>
+      </el-dialog>
     </div>
   </PageContainer>
 </template>
@@ -290,6 +389,31 @@ watch(
   margin-bottom: -18px;
 }
 
+.batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-primary);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f0f5ff 0%, var(--color-bg-card) 100%);
+}
+
+.batch-bar__summary {
+  color: var(--color-text-1);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.batch-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .name-cell {
   display: flex;
   flex-direction: column;
@@ -315,6 +439,12 @@ watch(
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+}
+
+.name-cell__note {
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .action-link {

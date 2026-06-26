@@ -12,9 +12,14 @@ import ProductList from '@/views/advisor/ProductList.vue'
 import ProductEdit from '@/views/advisor/ProductEdit.vue'
 import ReviewPendingList from '@/views/review/ReviewPendingList.vue'
 import ReviewDetail from '@/views/review/ReviewDetail.vue'
+import ReviewHistory from '@/views/review/ReviewHistory.vue'
 import AdvisorZoneList from '@/views/public/AdvisorZoneList.vue'
 import AdvisorZoneDetail from '@/views/public/AdvisorZoneDetail.vue'
 import MySubscriptions from '@/views/public/MySubscriptions.vue'
+import UserDashboard from '@/views/common/UserDashboard.vue'
+import Notifications from '@/views/common/Notifications.vue'
+import AdminDashboard from '@/views/admin/AdminDashboard.vue'
+import AdminUsers from '@/views/admin/AdminUsers.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -49,6 +54,26 @@ const router = createRouter({
             roles: ['USER'],
             title: '我的订阅',
             description: '用户端我的订阅页'
+          }
+        },
+        {
+          path: 'notifications',
+          name: 'Notifications',
+          component: Notifications,
+          meta: {
+            requiresAuth: true,
+            title: '消息通知',
+            description: '系统通知'
+          }
+        },
+        {
+          path: 'my/dashboard',
+          name: 'UserDashboard',
+          component: UserDashboard,
+          meta: {
+            requiresAuth: true,
+            title: '我的工作台',
+            description: '用户端个人工作台'
           }
         },
         {
@@ -115,6 +140,39 @@ const router = createRouter({
             roles: ['REVIEWER'],
             title: '审核详情',
             description: '审核员审核详情页'
+          }
+        },
+        {
+          path: 'review/my-history',
+          name: 'ReviewHistory',
+          component: ReviewHistory,
+          meta: {
+            requiresAuth: true,
+            roles: ['REVIEWER'],
+            title: '我的审核记录',
+            description: '审核员历史记录页'
+          }
+        },
+        {
+          path: 'admin/dashboard',
+          name: 'AdminDashboard',
+          component: AdminDashboard,
+          meta: {
+            requiresAuth: true,
+            roles: ['ADMIN'],
+            title: '管理后台',
+            description: '系统运营概览'
+          }
+        },
+        {
+          path: 'admin/users',
+          name: 'AdminUsers',
+          component: AdminUsers,
+          meta: {
+            requiresAuth: true,
+            roles: ['ADMIN'],
+            title: '用户管理',
+            description: '用户管理与角色分配'
           }
         }
       ]

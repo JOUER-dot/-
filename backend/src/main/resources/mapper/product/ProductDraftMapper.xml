@@ -33,4 +33,8 @@
         from advisor_product_draft
         where product_id = #{productId}
     </select>
+
+    <delete id="deleteByProductId">
+        delete from advisor_product_draft where product_id = #{productId}
+    </delete>
 </mapper>

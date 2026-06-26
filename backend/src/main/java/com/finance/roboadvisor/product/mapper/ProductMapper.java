@@ -42,4 +42,6 @@ public interface ProductMapper {
                         @Param("type") String type,
                         @Param("riskLevel") String riskLevel,
                         @Param("keyword") String keyword);
+
+    int deleteById(@Param("id") Long id);
 }

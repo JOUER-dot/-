@@ -6,16 +6,20 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import ActionBar from '@/components/ui/ActionBar.vue'
 import StatCard from '@/components/ui/StatCard.vue'
+import SkeletonLoader from '@/components/common/SkeletonLoader.vue'
 import ProductBaseForm from '@/components/product/ProductBaseForm.vue'
 import ProductParamForm from '@/components/product/ProductParamForm.vue'
 import ComponentEditor from '@/components/product/ComponentEditor.vue'
+import { buildProductSubmitPayload, getProductVersionContext } from './product-submit'
 import {
   createProduct,
   getProductDetail,
   submitProduct,
+  type ProductChangeType,
   type ProductComponentItem,
   type ProductDetail,
   type ProductSavePayload,
+  type ProductSubmitPayload,
   updateProduct,
   withdrawProduct
 } from '@/api/product'
@@ -62,13 +66,24 @@ const productId = computed(() => {
 
 const isCreateMode = computed(() => !productId.value)
 const isDetailMode = computed(() => route.name === 'AdvisorProductDetail')
-const canEditDraft = computed(() => ['DRAFT', 'REJECTED'].includes(productForm.status))
+const isNewVersion = computed(() => route.query.newVersion === '1')
+const canEditDraft = computed(() => ['DRAFT', 'REJECTED'].includes(productForm.status) || (productForm.status === 'PUBLISHED' && isNewVersion.value))
 const readOnly = computed(() => !isCreateMode.value && (isDetailMode.value || !canEditDraft.value))
+const versionContext = computed(() =>
+  getProductVersionContext({
+    publishedVersion: productForm.publishedVersion
+  })
+)
+
+const submitDialog = reactive({
+  visible: false,
+  changeType: 'NORMAL' as ProductChangeType,
+  versionNote: ''
+})
 
 const pageTitle = computed(() => {
-  if (isCreateMode.value) {
-    return '创建产品'
-  }
+  if (isCreateMode.value) return '创建产品'
+  if (isNewVersion.value) return '创建新版本'
   return readOnly.value ? '产品详情' : '编辑草稿'
 })
 
@@ -149,25 +164,24 @@ const loadDetail = async () => {
 }
 
 const validateDraftBeforeSave = () => {
-  if (!productForm.name.trim()) {
-    throw new Error('产品名称不能为空')
-  }
-  if (!productForm.type) {
-    throw new Error('产品类型不能为空')
-  }
-  if (!productForm.riskLevel) {
-    throw new Error('风险等级不能为空')
-  }
+  const errors: string[] = []
+  if (!productForm.name.trim()) errors.push('产品名称不能为空')
+  if (!productForm.type) errors.push('产品类型不能为空')
+  if (!productForm.riskLevel) errors.push('风险等级不能为空')
+  if (productForm.name.trim().length > 100) errors.push('产品名称不能超过100个字符')
+  if (productForm.baseInfo.productSummary.trim().length > 500) errors.push('产品简介不能超过500个字符')
+  if (productForm.featureTags.length > 10) errors.push('产品标签不能超过10个')
+  if (errors.length > 0) throw new Error(errors.join('；'))
 }
 
 const validateBeforeSubmit = () => {
   validateDraftBeforeSave()
-  if (productForm.components.length === 0) {
-    throw new Error('请至少选择一只基金')
-  }
-  if (Math.abs(weightTotal.value - 1) > 0.000001) {
-    throw new Error('组合权重合计必须等于 1')
-  }
+  const errors: string[] = []
+  if (productForm.components.length === 0) errors.push('请至少选择一只基金')
+  if (Math.abs(weightTotal.value - 1) > 0.000001) errors.push('组合权重合计必须等于 1')
+  if (productForm.params.rebalanceCycleDays !== null && (productForm.params.rebalanceCycleDays < 1 || productForm.params.rebalanceCycleDays > 365)) errors.push('调仓周期应在 1~365 天之间')
+  if (productForm.params.investHorizonMonths !== null && productForm.params.investHorizonMonths < 1) errors.push('建议持有期不能小于1个月')
+  if (errors.length > 0) throw new Error(errors.join('；'))
 }
 
 const buildPayload = (): ProductSavePayload => ({
@@ -225,9 +239,6 @@ const handleSaveDraft = async () => {
 const handleSubmit = async () => {
   try {
     validateBeforeSubmit()
-    await ElMessageBox.confirm('确认提交审核吗？提交后将进入待审状态。', '提交审核', {
-      type: 'warning'
-    })
   } catch (error) {
     if (error instanceof Error) {
       ElMessage.error(error.message)
@@ -235,6 +246,23 @@ const handleSubmit = async () => {
     return
   }
 
+  if (versionContext.value.isIteration) {
+    submitDialog.visible = true
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm('确认提交审核吗？提交后将进入待审状态。', '提交审核', {
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+
+  await performSubmit({})
+}
+
+const performSubmit = async (submitPayload: ProductSubmitPayload) => {
   submitting.value = true
   try {
     let targetProductId = productId.value
@@ -245,12 +273,42 @@ const handleSubmit = async () => {
     } else {
       await updateProduct(targetProductId, payload)
     }
-    await submitProduct(targetProductId)
+    await submitProduct(targetProductId, submitPayload)
     ElMessage.success('已提交审核')
+    submitDialog.visible = false
+    submitDialog.changeType = 'NORMAL'
+    submitDialog.versionNote = ''
     await router.replace(`/admin/products/${targetProductId}`)
   } finally {
     submitting.value = false
   }
+}
+
+const handleConfirmIterationSubmit = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确认提交版本迭代吗？审核通过后将替换当前线上 V${versionContext.value.currentPublishedVersionNo ?? '-'}`,
+      '提交版本迭代',
+      {
+        type: 'warning'
+      }
+    )
+  } catch {
+    return
+  }
+
+  await performSubmit(
+    buildProductSubmitPayload(versionContext.value, {
+      changeType: submitDialog.changeType,
+      versionNote: submitDialog.versionNote
+    })
+  )
+}
+
+const handleCloseSubmitDialog = () => {
+  submitDialog.visible = false
+  submitDialog.changeType = 'NORMAL'
+  submitDialog.versionNote = ''
 }
 
 const handleWithdraw = async () => {
@@ -280,6 +338,8 @@ void loadDetail()
 
 <template>
   <div v-loading="loading" class="app-page">
+    <SkeletonLoader v-if="loading" type="card" :rows="4" />
+    <template v-else>
     <PageHeader :title="pageTitle" />
 
     <div class="stat-grid">
@@ -306,6 +366,26 @@ void loadDetail()
       v-if="productForm.status === 'PENDING_REVIEW'"
       title="当前产品正在审核中，仅支持查看详情或撤回审核。"
       type="warning"
+      show-icon
+      :closable="false"
+      class="mb-16"
+    />
+
+    <el-alert
+      v-if="isNewVersion"
+      :title="`正在为「${productForm.name}」创建新版本`"
+      description="修改后提交审核，通过后将替换当前线上版本。"
+      type="info"
+      show-icon
+      :closable="false"
+      class="mb-16"
+    />
+
+    <el-alert
+      v-if="versionContext.isIteration && !isNewVersion"
+      :title="`当前正在编辑线上 V${versionContext.currentPublishedVersionNo ?? '-'} 的迭代草稿`"
+      description="本次提交将生成新的审核版本，不会直接覆盖当前线上版本。"
+      type="info"
       show-icon
       :closable="false"
       class="mb-16"
@@ -387,6 +467,45 @@ void loadDetail()
         撤回审核
       </el-button>
     </ActionBar>
+
+    <el-dialog
+      v-model="submitDialog.visible"
+      title="提交版本迭代"
+      width="560px"
+      :close-on-click-modal="false"
+      @close="handleCloseSubmitDialog"
+    >
+      <div class="submit-dialog">
+        <div class="submit-dialog__tip">
+          将基于当前线上版本发起新的审核流程，审核通过后再替换线上内容。
+        </div>
+        <el-form label-position="top">
+          <el-form-item label="变更类型">
+            <el-radio-group v-model="submitDialog.changeType">
+              <el-radio-button label="NORMAL">普通变更</el-radio-button>
+              <el-radio-button label="MAJOR">重大变更</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="版本说明">
+            <el-input
+              v-model="submitDialog.versionNote"
+              type="textarea"
+              :rows="4"
+              maxlength="200"
+              show-word-limit
+              placeholder="填写本次迭代的主要变化，便于审核和订阅通知。"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="handleCloseSubmitDialog">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="handleConfirmIterationSubmit">
+          确认提交
+        </el-button>
+      </template>
+    </el-dialog>
+    </template>
   </div>
 </template>
 
@@ -443,5 +562,16 @@ void loadDetail()
 
 .mb-16 {
   margin-bottom: 16px;
+}
+
+.submit-dialog__tip {
+  margin-bottom: 16px;
+  color: var(--color-text-2);
+  line-height: 1.7;
+}
+
+@media (max-width: 768px) {
+  .edit-content :deep(.el-row) { flex-direction: column; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

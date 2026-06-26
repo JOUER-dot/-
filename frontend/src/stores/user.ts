@@ -7,6 +7,8 @@ export interface UserInfo {
   id: number
   username: string
   nickname: string
+  phone?: string
+  email?: string
 }
 
 export interface LoginResponse {
@@ -20,6 +22,8 @@ export interface CurrentUserResponse {
   id: number
   username: string
   nickname: string
+  phone?: string
+  email?: string
   roles: string[]
 }
 
@@ -103,7 +107,9 @@ export const useUserStore = defineStore('user', () => {
     userInfo.value = {
       id: data.id,
       username: data.username,
-      nickname: data.nickname
+      nickname: data.nickname,
+      phone: data.phone,
+      email: data.email
     }
     roles.value = data.roles || []
     persist()

@@ -7,6 +7,7 @@ import com.finance.roboadvisor.review.dto.ReviewRejectDTO;
 import com.finance.roboadvisor.review.service.ReviewService;
 import com.finance.roboadvisor.review.vo.ReviewDetailVO;
 import com.finance.roboadvisor.review.vo.ReviewPendingListItemVO;
+import com.finance.roboadvisor.review.vo.ReviewHistoryItemVO;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/reviewer/products")
@@ -53,5 +56,26 @@ public class ReviewController {
                                          @Valid @RequestBody ReviewRejectDTO dto) {
         reviewService.rejectProduct(productId, dto);
         return ApiResult.success("审核驳回成功");
+    }
+
+    @PostMapping("/batch-approve")
+    public ApiResult<Void> batchApprove(@RequestParam("ids") List<Long> productIds,
+                                        @RequestBody(required = false) ReviewApproveDTO dto) {
+        reviewService.batchApprove(productIds, dto);
+        return ApiResult.success("批量审核通过成功");
+    }
+
+    @PostMapping("/batch-reject")
+    public ApiResult<Void> batchReject(@RequestParam("ids") List<Long> productIds,
+                                       @Valid @RequestBody ReviewRejectDTO dto) {
+        reviewService.batchReject(productIds, dto);
+        return ApiResult.success("批量审核驳回成功");
+    }
+
+    @GetMapping("/my-history")
+    public ApiResult<List<ReviewHistoryItemVO>> getMyReviewHistory(
+            @RequestParam(required = false) Integer pageNum,
+            @RequestParam(required = false) Integer pageSize) {
+        return ApiResult.success(reviewService.getMyReviewHistory(pageNum, pageSize));
     }
 }

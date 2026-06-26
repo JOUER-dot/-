@@ -12,4 +12,6 @@ public interface ProductDraftMapper {
     int updateByProductId(AdvisorProductDraft draft);
 
     AdvisorProductDraft selectByProductId(@Param("productId") Long productId);
+
+    int deleteByProductId(@Param("productId") Long productId);
 }

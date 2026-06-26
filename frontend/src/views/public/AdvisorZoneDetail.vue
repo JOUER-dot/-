@@ -27,6 +27,8 @@ const userStore = useUserStore()
 const loading = ref(false)
 const subscribing = ref(false)
 const subscribed = ref(false)
+const fundDialogVisible = ref(false)
+const selectedFund = ref<PublicProductDetail['components'][0] | null>(null)
 
 const detail = reactive<PublicProductDetail>({
   id: 0,
@@ -103,28 +105,24 @@ const handleSubscribe = async () => {
     return
   }
   if (!userStore.isLoggedIn) {
-    await router.push({
-      path: '/login',
-      query: { redirect: route.fullPath }
-    })
+    await router.push({ path: '/login', query: { redirect: route.fullPath } })
     return
   }
   try {
-    await ElMessageBox.confirm('确认订阅当前产品吗？', '确认订阅', {
-      type: 'warning'
-    })
-  } catch {
-    return
-  }
+    await ElMessageBox.confirm('确认订阅当前产品吗？', '确认订阅', { type: 'warning' })
+  } catch { return }
 
   subscribing.value = true
   try {
     await subscribeProduct(productId.value)
     subscribed.value = true
     ElMessage.success('订阅成功')
-  } finally {
-    subscribing.value = false
-  }
+  } finally { subscribing.value = false }
+}
+
+const handleFundClick = (fund: PublicProductDetail['components'][0]) => {
+  selectedFund.value = fund
+  fundDialogVisible.value = true
 }
 
 void loadDetail()
@@ -133,69 +131,93 @@ void loadDetail()
 <template>
   <PageContainer>
     <div v-loading="loading" class="detail-page">
-      <SectionCard class="hero-card">
-        <div class="hero-top">
-          <div class="hero-main">
-            <div class="hero-tags">
-              <el-tag effect="dark">{{ detail.riskLevel || '-' }}</el-tag>
-              <el-tag effect="plain">{{ productTypeLabel(detail.type) }}</el-tag>
-              <el-tag v-if="detail.strategyCode" effect="plain">策略：{{ detail.strategyCode }}</el-tag>
-            </div>
-            <h1 class="hero-title">{{ detail.name || '产品详情' }}</h1>
-            <p class="hero-desc">{{ productSummary }}</p>
-            <div class="tag-list">
-              <el-tag v-for="tag in detail.featureTags" :key="tag" effect="plain">{{ tag }}</el-tag>
-              <span v-if="detail.featureTags.length === 0" class="muted-text">暂无产品标签</span>
-            </div>
-          </div>
-
-          <div class="hero-side">
-            <div class="hero-side__label">目标客户</div>
-            <div class="hero-side__value">{{ targetCustomer }}</div>
-            <div class="hero-side__label">建议持有期（月）</div>
-            <div class="hero-side__value">{{ investHorizonText }}</div>
-          </div>
-        </div>
-      </SectionCard>
-
-      <div class="stat-grid">
-        <StatCard
-          v-for="item in summaryCards"
-          :key="item.label"
-          :label="item.label"
-          :value="item.value"
-          :hint="item.hint"
-        />
+      <!-- 标题栏 -->
+      <div class="detail-bar">
+        <el-button link class="bar-back" @click="router.push('/advisor-zone')">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          返回
+        </el-button>
+        <el-button type="primary" size="large" class="bar-subscribe" :loading="subscribing" @click="handleSubscribe">
+          {{ subscribeButtonText }}
+        </el-button>
       </div>
 
-      <div class="summary-panels">
-        <SectionCard class="subscribe-card" title="立即订阅">
-          <div class="subscribe-actions">
-            <el-button type="primary" :loading="subscribing" @click="handleSubscribe">
-              {{ subscribeButtonText }}
-            </el-button>
-            <el-button v-if="userStore.isLoggedIn" @click="router.push('/my-subscriptions')">查看我的订阅</el-button>
-            <el-button v-else @click="router.push('/login')">先登录</el-button>
+      <!-- 产品主卡片 -->
+      <div class="product-masthead">
+        <div class="masthead-bg" />
+        <div class="masthead-content">
+          <div class="masthead-tags">
+            <span class="mh-tag mh-tag--risk" :class="`risk-${(detail.riskLevel || 'r3').toLowerCase()}`">{{ detail.riskLevel }}</span>
+            <span class="mh-tag mh-tag--type">{{ productTypeLabel(detail.type) }}</span>
+            <span v-if="detail.strategyCode" class="mh-tag mh-tag--code">{{ detail.strategyCode }}</span>
           </div>
-        </SectionCard>
 
-        <SectionCard title="产品概览">
-          <el-descriptions :column="1" border>
-            <el-descriptions-item label="产品类型">{{ productTypeLabel(detail.type) }}</el-descriptions-item>
-            <el-descriptions-item label="风险等级">{{ detail.riskLevel || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="策略编码">{{ formatText(detail.strategyCode) }}</el-descriptions-item>
-            <el-descriptions-item label="风险提示">{{ riskTips }}</el-descriptions-item>
-          </el-descriptions>
-        </SectionCard>
+          <h1 class="mh-title">{{ detail.name || '产品详情' }}</h1>
 
-        <SectionCard title="策略参数">
-          <el-descriptions :column="1" border>
-            <el-descriptions-item label="调仓周期（天）">{{ formatText(detail.params.rebalanceCycleDays) }}</el-descriptions-item>
-            <el-descriptions-item label="单基金最小权重">{{ formatPercent(detail.params.minSingleFundWeight) }}</el-descriptions-item>
-            <el-descriptions-item label="单基金最大权重">{{ formatPercent(detail.params.maxSingleFundWeight) }}</el-descriptions-item>
-            <el-descriptions-item label="建议持有期（月）">{{ investHorizonText }}</el-descriptions-item>
-          </el-descriptions>
-        </SectionCard>
+          <p class="mh-desc">{{ productSummary || '暂无产品简介' }}</p>
+
+          <div class="mh-meta">
+            <span v-if="targetCustomer && targetCustomer !== '-'">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="2.5" stroke="#8a94a3" stroke-width="1.2"/><path d="M2 12C2 10 4.24 8.5 7 8.5C9.76 8.5 12 10 12 12" stroke="#8a94a3" stroke-width="1.2" stroke-linecap="round"/></svg>
+              {{ targetCustomer }}
+            </span>
+            <span v-if="investHorizonText && investHorizonText !== '-'">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#8a94a3" stroke-width="1.2"/><path d="M7 4V7L9 9" stroke="#8a94a3" stroke-width="1.2" stroke-linecap="round"/></svg>
+              建议持有 {{ investHorizonText }} 个月
+            </span>
+          </div>
+
+          <div v-if="detail.featureTags?.length" class="mh-features">
+            <el-tag v-for="tag in detail.featureTags" :key="tag" effect="plain" size="small" class="mh-feature-tag">{{ tag }}</el-tag>
+          </div>
+        </div>
+
+        <!-- 数据面板 -->
+        <div class="masthead-metrics">
+          <div class="metric-item">
+            <div class="metric-icon metric-icon--nav">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 16L7 10L11 13L16 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="metric-body">
+              <span class="metric-label">最新净值</span>
+              <span class="metric-value">{{ formatDecimal(latestNav) }}</span>
+            </div>
+          </div>
+          <div class="metric-divider" />
+          <div class="metric-item metric-item--highlight">
+            <div class="metric-icon metric-icon--return">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2V16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 7L9 3L13 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="metric-body">
+              <span class="metric-label">累计收益</span>
+              <span class="metric-value" :class="Number(latestCumReturn) >= 0 ? 'up' : 'down'">
+                {{ formatPercent(latestCumReturn) }}
+              </span>
+            </div>
+          </div>
+          <div class="metric-divider" />
+          <div class="metric-item">
+            <div class="metric-icon metric-icon--fund">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="7" width="3" height="9" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="7.5" y="4" width="3" height="12" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="13" y="2" width="3" height="14" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+            </div>
+            <div class="metric-body">
+              <span class="metric-label">成份数量</span>
+              <span class="metric-value">{{ componentCount }} <span class="metric-unit">只基金</span></span>
+            </div>
+          </div>
+          <div class="metric-divider" />
+          <div class="metric-item">
+            <div class="metric-icon metric-icon--version">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="1.2"/><path d="M9 5V9L12 12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            </div>
+            <div class="metric-body">
+              <span class="metric-label">版本</span>
+              <span class="metric-value">V{{ detail.versionNo || '-' }}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="detail-main">
@@ -224,7 +246,7 @@ void loadDetail()
         </SectionCard>
 
         <SectionCard title="基金成份">
-          <el-table :data="detail.components" border>
+          <el-table :data="detail.components" border @row-click="handleFundClick" style="cursor:pointer">
             <el-table-column prop="fundCode" label="基金代码" min-width="120" />
             <el-table-column prop="fundName" label="基金名称" min-width="180" />
             <el-table-column prop="fundType" label="基金类型" min-width="120" />
@@ -237,6 +259,20 @@ void loadDetail()
           </el-table>
         </SectionCard>
       </div>
+
+      <!-- 基金详情对话框 -->
+      <el-dialog v-model="fundDialogVisible" :title="selectedFund?.fundName || '基金详情'" width="520px">
+        <template v-if="selectedFund">
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="基金名称">{{ selectedFund.fundName }}</el-descriptions-item>
+            <el-descriptions-item label="基金代码">{{ formatText(selectedFund.fundCode) }}</el-descriptions-item>
+            <el-descriptions-item label="基金类型">{{ formatText(selectedFund.fundType) }}</el-descriptions-item>
+            <el-descriptions-item label="风险等级">{{ formatText(selectedFund.riskLevel) }}</el-descriptions-item>
+            <el-descriptions-item label="基金公司">{{ formatText(selectedFund.companyName) }}</el-descriptions-item>
+            <el-descriptions-item label="配置权重">{{ formatPercent(selectedFund.weight) }}</el-descriptions-item>
+          </el-descriptions>
+        </template>
+      </el-dialog>
     </div>
   </PageContainer>
 </template>
@@ -248,74 +284,201 @@ void loadDetail()
   gap: 16px;
 }
 
-.hero-card {
+/* 标题栏 */
+.detail-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bar-back {
+  font-size: 13px;
+  color: var(--color-text-3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.bar-back:hover { color: var(--color-text-1); }
+.bar-subscribe {
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* 产品主卡片 */
+.product-masthead {
+  position: relative;
   border-radius: var(--radius-card);
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-soft);
 }
 
-.hero-top {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
-  gap: 16px;
+.masthead-bg {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 180px;
+  background: linear-gradient(135deg, rgba(14,46,85,0.03) 0%, rgba(200,164,93,0.04) 100%);
+  pointer-events: none;
 }
 
-.hero-tags {
+.masthead-content {
+  position: relative;
+  padding: 28px 32px 0;
+  z-index: 1;
+}
+
+.masthead-tags {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.mh-tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 6px;
+}
+.mh-tag--risk {
+  color: #fff;
+}
+.mh-tag--risk.risk-r1 { background: #1e9e62; }
+.mh-tag--risk.risk-r2 { background: #2f6bde; }
+.mh-tag--risk.risk-r3 { background: #d89b2b; }
+.mh-tag--risk.risk-r4 { background: #e67e22; }
+.mh-tag--risk.risk-r5 { background: #c53b32; }
+.mh-tag--type {
+  color: var(--color-text-2);
+  background: var(--gray-100);
+  border: 1px solid var(--color-border);
+}
+.mh-tag--code {
+  color: var(--color-text-2);
+  background: var(--gray-50);
+  border: 1px solid var(--color-border);
+}
+.mh-tag--major {
+  color: var(--danger-600);
+  background: var(--danger-50);
+  border: 1px solid var(--danger-600);
+}
+
+.mh-title {
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--color-text-1);
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+.mh-desc {
+  margin: 10px 0 0;
+  font-size: 15px;
+  color: var(--color-text-2);
+  line-height: 1.6;
+}
+
+.mh-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 20px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--color-text-3);
+}
+.mh-meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.hero-title {
-  margin: 12px 0 8px;
-  font-size: 28px;
-  line-height: 36px;
-  color: var(--color-text-1);
-  font-weight: 900;
+.mh-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 16px;
+  padding-bottom: 24px;
+}
+.mh-feature-tag {
+  border-radius: 6px;
 }
 
-.hero-desc {
-  margin: 0;
-  color: var(--color-text-2);
-  line-height: 24px;
+/* 数据面板 */
+.masthead-metrics {
+  display: flex;
+  align-items: stretch;
+  margin: 0 32px 24px;
+  padding: 20px 0 0;
+  border-top: 1px solid var(--color-border);
 }
 
-.hero-side {
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(22, 59, 102, 0.12);
-  background: linear-gradient(180deg, rgba(22, 59, 102, 0.08) 0%, rgba(255, 255, 255, 0.92) 100%);
+.metric-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 8px;
 }
 
-.hero-side__label {
-  color: var(--color-text-2);
-  font-size: 12px;
+.metric-item--highlight {
+  background: var(--brand-50);
+  border-radius: 12px;
+  padding: 8px 14px;
+  margin: -4px 0;
 }
 
-.hero-side__value {
-  margin: 6px 0 12px;
-  color: var(--color-text-1);
+.metric-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-border);
+  margin: 0 4px;
+}
+
+.metric-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.metric-icon--nav { background: rgba(31,92,153,0.08); color: #1f5c99; }
+.metric-icon--return { background: rgba(30,158,98,0.08); color: #1e9e62; }
+.metric-icon--fund { background: rgba(216,155,43,0.08); color: #d89b2b; }
+.metric-icon--version { background: rgba(47,107,222,0.08); color: #2f6bde; }
+
+.metric-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--color-text-3);
+  letter-spacing: 0.3px;
+}
+
+.metric-value {
   font-size: 18px;
   font-weight: 800;
+  color: var(--color-text-1);
+  line-height: 1.2;
 }
 
-.tag-list {
-  margin-top: 14px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.metric-value.up { color: var(--success-600); }
+.metric-value.down { color: var(--danger-600); }
+
+.metric-unit {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-3);
 }
 
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-}
-
-.summary-panels {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
+/* 其余区块 */
 .detail-main {
   display: flex;
   flex-direction: column;
@@ -337,23 +500,14 @@ void loadDetail()
   margin-top: 4px;
 }
 
-.subscribe-card {
-  border-radius: var(--radius-card);
-}
-
-.subscribe-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-@media (max-width: 960px) {
-  .hero-top {
-    grid-template-columns: 1fr;
+@media (max-width: 860px) {
+  .masthead-metrics {
+    flex-direction: column;
+    gap: 12px;
   }
-
-  .summary-panels {
-    grid-template-columns: 1fr;
-  }
+  .metric-divider { display: none; }
+  .metric-item { padding: 8px; }
+  .masthead-content { padding: 20px 20px 0; }
+  .masthead-metrics { margin: 0 20px 20px; }
 }
 </style>

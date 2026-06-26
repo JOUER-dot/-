@@ -3,12 +3,15 @@ package com.finance.roboadvisor.product.controller;
 import com.finance.roboadvisor.common.api.ApiResult;
 import com.finance.roboadvisor.common.api.PageResult;
 import com.finance.roboadvisor.product.dto.ProductSaveDTO;
+import com.finance.roboadvisor.product.dto.ProductSubmitDTO;
+import com.finance.roboadvisor.product.entity.AdvisorProductFlowLog;
 import com.finance.roboadvisor.product.service.ProductService;
 import com.finance.roboadvisor.product.vo.ProductCreateVO;
 import com.finance.roboadvisor.product.vo.ProductDetailVO;
 import com.finance.roboadvisor.product.vo.ProductListItemVO;
 import com.finance.roboadvisor.product.vo.ReviewRecordVO;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,8 +61,9 @@ public class ProductController {
     }
 
     @PostMapping("/{id}/submit")
-    public ApiResult<Void> submitProduct(@PathVariable("id") Long productId) {
-        productService.submitProduct(productId);
+    public ApiResult<Void> submitProduct(@PathVariable("id") Long productId,
+                                         @RequestBody(required = false) ProductSubmitDTO dto) {
+        productService.submitProduct(productId, dto);
         return ApiResult.success("提交审核成功");
     }
 
@@ -81,8 +85,25 @@ public class ProductController {
         return ApiResult.success("净值与持仓快照重算成功");
     }
 
+    @DeleteMapping("/{id}")
+    public ApiResult<Void> deleteProduct(@PathVariable("id") Long productId) {
+        productService.deleteProduct(productId);
+        return ApiResult.success("删除成功");
+    }
+
+    @PostMapping("/{id}/copy")
+    public ApiResult<Long> copyProduct(@PathVariable("id") Long productId) {
+        Long newProductId = productService.copyProduct(productId);
+        return ApiResult.success("复制成功", newProductId);
+    }
+
     @GetMapping("/{id}/reviews")
     public ApiResult<List<ReviewRecordVO>> listReviews(@PathVariable("id") Long productId) {
         return ApiResult.success(productService.listReviews(productId));
+    }
+
+    @GetMapping("/{id}/flow-logs")
+    public ApiResult<List<AdvisorProductFlowLog>> listFlowLogs(@PathVariable("id") Long productId) {
+        return ApiResult.success(productService.listFlowLogs(productId));
     }
 }

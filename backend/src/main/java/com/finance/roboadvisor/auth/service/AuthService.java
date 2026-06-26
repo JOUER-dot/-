@@ -1,7 +1,9 @@
 package com.finance.roboadvisor.auth.service;
 
+import com.finance.roboadvisor.auth.dto.ChangePasswordDTO;
 import com.finance.roboadvisor.auth.dto.LoginDTO;
 import com.finance.roboadvisor.auth.dto.RegisterDTO;
+import com.finance.roboadvisor.auth.dto.UpdateProfileDTO;
 import com.finance.roboadvisor.auth.vo.CurrentUserVO;
 import com.finance.roboadvisor.auth.vo.LoginVO;
 
@@ -14,4 +16,8 @@ public interface AuthService {
     CurrentUserVO getCurrentUser();
 
     void logout();
+
+    void changePassword(ChangePasswordDTO dto);
+
+    void updateProfile(UpdateProfileDTO dto);
 }

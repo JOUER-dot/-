@@ -4,6 +4,8 @@ import com.finance.roboadvisor.auth.entity.SysUser;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 @Mapper
 public interface UserMapper {
 
@@ -16,4 +18,12 @@ public interface UserMapper {
     int countByPhone(@Param("phone") String phone);
 
     int insert(SysUser user);
+
+    int updatePassword(@Param("id") Long id, @Param("passwordHash") String passwordHash);
+
+    int updateProfile(SysUser user);
+
+    int updateStatus(@Param("id") Long id, @Param("status") Integer status);
+
+    List<SysUser> selectAll();
 }
