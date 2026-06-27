@@ -54,9 +54,9 @@ npm run dev
 | 用户名 | 密码 | 角色 |
 |---|---|---|
 | admin | admin123 | 系统管理员 |
-| advisor1 | admin123 | 投顾 |
-| reviewer1 | admin123 | 投资决策委员会 |
-| user1 | admin123 | 普通用户 |
+| advisor01 | 123456 | 投顾 |
+| reviewer01 | 123456 | 投资决策委员会 |
+| user01 | 123456 | 普通用户 |
 
 ## 项目结构
 
