@@ -51,3 +51,7 @@ export function toggleUserStatus(userId: number, enabled: boolean) {
 export function assignUserRole(userId: number, roleCode: string) {
   return request.post<void>(`/admin/system/users/${userId}/assign-role?roleCode=${roleCode}`)
 }
+
+export function setUserRole(userId: number, roleCode: string) {
+  return request.put<void>(`/admin/system/users/${userId}/role`, { roleCode })
+}

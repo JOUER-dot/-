@@ -25,5 +25,7 @@ public interface UserMapper {
 
     int updateStatus(@Param("id") Long id, @Param("status") Integer status);
 
+    int updatePin(@Param("id") Long id, @Param("subPin") String subPin);
+
     List<SysUser> selectAll();
 }

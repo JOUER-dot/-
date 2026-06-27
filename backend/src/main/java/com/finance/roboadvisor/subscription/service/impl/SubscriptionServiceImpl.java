@@ -8,6 +8,7 @@ import com.finance.roboadvisor.notification.service.NotificationService;
 import com.finance.roboadvisor.product.mapper.ProductMapper;
 import com.finance.roboadvisor.publicapi.mapper.PublicProductMapper;
 import com.finance.roboadvisor.subscription.dto.MySubscriptionQueryDTO;
+import com.finance.roboadvisor.transaction.service.TransactionService;
 import com.finance.roboadvisor.subscription.entity.AdvisorProductSubscription;
 import com.finance.roboadvisor.subscription.entity.SubscriptionVersionAction;
 import com.finance.roboadvisor.subscription.mapper.SubscriptionMapper;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,22 +45,25 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final SubscriptionVersionActionMapper subscriptionVersionActionMapper;
     private final NotificationService notificationService;
     private final ProductMapper productMapper;
+    private final TransactionService transactionService;
 
     public SubscriptionServiceImpl(SubscriptionMapper subscriptionMapper,
                                    PublicProductMapper publicProductMapper,
                                    SubscriptionVersionActionMapper subscriptionVersionActionMapper,
                                    NotificationService notificationService,
-                                   ProductMapper productMapper) {
+                                   ProductMapper productMapper,
+                                   TransactionService transactionService) {
         this.subscriptionMapper = subscriptionMapper;
         this.publicProductMapper = publicProductMapper;
         this.subscriptionVersionActionMapper = subscriptionVersionActionMapper;
         this.notificationService = notificationService;
         this.productMapper = productMapper;
+        this.transactionService = transactionService;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void subscribe(Long productId) {
+    public void subscribe(Long productId, BigDecimal amount) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long publishedCount = publicProductMapper.countPublishedProductById(productId);
         if (publishedCount == null || publishedCount == 0) {
@@ -71,14 +76,25 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             subscription.setProductId(productId);
             subscription.setUserId(userId);
             subscription.setStatus(STATUS_ACTIVE);
+            subscription.setInvestAmount(amount);
+            subscription.setCurrentValue(amount);
             subscriptionMapper.insert(subscription);
             notifyAdvisorOnSubscription(productId, "订阅");
+            // Notify the subscriber
+            notificationService.createNotification(userId, "订阅成功", "您已成功订阅产品", "SUBSCRIPTION", "/my-subscriptions");
+            if (amount != null) {
+                com.finance.roboadvisor.product.entity.AdvisorProduct p = productMapper.selectById(productId);
+                transactionService.record(userId, productId, p != null ? p.getName() : String.valueOf(productId), "SUBSCRIBE", amount);
+            }
             return;
         }
         if (STATUS_ACTIVE.equals(existing.getStatus())) {
             return;
         }
         subscriptionMapper.updateStatusToActive(existing.getId());
+        if (amount != null) {
+            subscriptionMapper.updateInvestAmount(existing.getId(), amount, amount);
+        }
         notifyAdvisorOnSubscription(productId, "订阅");
     }
 

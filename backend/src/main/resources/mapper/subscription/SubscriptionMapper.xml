@@ -29,13 +29,21 @@
     </select>
 
     <insert id="insert" parameterType="com.finance.roboadvisor.subscription.entity.AdvisorProductSubscription" useGeneratedKeys="true" keyProperty="id">
-        insert into advisor_product_subscription (product_id, user_id, status)
-        values (#{productId}, #{userId}, #{status})
+        insert into advisor_product_subscription (product_id, user_id, status, invest_amount, current_value)
+        values (#{productId}, #{userId}, #{status}, #{investAmount}, #{currentValue})
     </insert>
 
     <update id="updateStatusToActive">
         update advisor_product_subscription
         set status = 'ACTIVE',
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="updateInvestAmount">
+        update advisor_product_subscription
+        set invest_amount = #{investAmount},
+            current_value = #{currentValue},
             updated_at = now()
         where id = #{id}
     </update>
@@ -63,6 +71,8 @@
         p.risk_level as riskLevel,
         p.status as productStatus,
         s.status as status,
+        s.invest_amount as investAmount,
+        s.current_value as currentValue,
         nav.nav as latestNav,
         nav.cum_return as latestCumReturn,
         s.created_at as subscribedAt
@@ -155,4 +165,26 @@
         where product_id = #{productId}
           and status = 'ACTIVE'
     </select>
+
+    <select id="countAll" resultType="long">
+        select count(1) from advisor_product_subscription
+    </select>
+
+    <select id="selectTopSubscribed" resultType="com.finance.roboadvisor.admin.vo.AdminDashboardVO$ProductSubscriptionVO">
+        select p.id as productId,
+               p.name as productName,
+               count(s.id) as subscriberCount
+        from advisor_product_subscription s
+                 inner join advisor_product p on p.id = s.product_id
+        where s.status = 'ACTIVE'
+        group by p.id, p.name
+        order by subscriberCount desc
+        limit #{limit}
+    </select>
+
+    <update id="cancelByUserId">
+        update advisor_product_subscription
+        set status = 'CANCELLED', updated_at = now()
+        where user_id = #{userId} and status = 'ACTIVE'
+    </update>
 </mapper>

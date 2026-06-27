@@ -119,4 +119,12 @@
     <delete id="deleteById">
         delete from advisor_product where id = #{id}
     </delete>
+
+    <select id="countAll" resultType="long">
+        select count(1) from advisor_product
+    </select>
+
+    <select id="countByStatus" resultType="long">
+        select count(1) from advisor_product where status = #{status}
+    </select>
 </mapper>

@@ -93,6 +93,7 @@ const handleLogin = async () => {
           </el-form>
           <div class="login-footer">
             <el-button link @click="router.push('/register')">没有账号？去注册</el-button>
+            <el-button link type="info" disabled>忘记密码？</el-button>
           </div>
         </div>
       </div>

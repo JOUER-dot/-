@@ -20,4 +20,31 @@
     <delete id="deleteByProductId">
         delete from advisor_product_flow_log where product_id = #{productId}
     </delete>
+
+    <select id="selectRecent" resultType="com.finance.roboadvisor.admin.vo.AdminDashboardVO$RecentChangeVO">
+        select l.product_id as productId,
+               p.name as productName,
+               l.action_type as actionType,
+               u.nickname as operatorName,
+               l.created_at as createdAt
+        from advisor_product_flow_log l
+                 inner join advisor_product p on p.id = l.product_id
+                 inner join sys_user u on u.id = l.operator_id
+        order by l.created_at desc
+        limit #{limit}
+    </select>
+
+    <select id="selectRecentByOperator" resultType="com.finance.roboadvisor.admin.vo.AdminDashboardVO$RecentChangeVO">
+        select l.product_id as productId,
+               p.name as productName,
+               l.action_type as actionType,
+               u.nickname as operatorName,
+               l.created_at as createdAt
+        from advisor_product_flow_log l
+                 inner join advisor_product p on p.id = l.product_id
+                 inner join sys_user u on u.id = l.operator_id
+        where l.operator_id = #{operatorId}
+        order by l.created_at desc
+        limit #{limit}
+    </select>
 </mapper>

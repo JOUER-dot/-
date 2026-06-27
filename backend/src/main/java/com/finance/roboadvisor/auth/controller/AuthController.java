@@ -9,12 +9,15 @@ import com.finance.roboadvisor.auth.vo.CurrentUserVO;
 import com.finance.roboadvisor.auth.vo.LoginVO;
 import com.finance.roboadvisor.common.api.ApiResult;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -58,5 +61,23 @@ public class AuthController {
     public ApiResult<Void> updateProfile(@Valid @RequestBody UpdateProfileDTO dto) {
         authService.updateProfile(dto);
         return ApiResult.success("个人信息更新成功");
+    }
+
+    @DeleteMapping("/account")
+    public ApiResult<Void> deleteAccount() {
+        authService.deleteAccount();
+        return ApiResult.success("账号已注销");
+    }
+
+    @PostMapping("/pin")
+    public ApiResult<Void> setPin(@RequestBody Map<String, String> body) {
+        authService.setPin(body.get("pin"));
+        return ApiResult.success("交易密码设置成功");
+    }
+
+    @PostMapping("/verify-password")
+    public ApiResult<Void> verifyPassword(@RequestBody Map<String, String> body) {
+        authService.verifyPassword(body.get("password"));
+        return ApiResult.success("密码验证通过");
     }
 }

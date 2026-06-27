@@ -11,6 +11,7 @@ public class SysUser {
     private String phone;
     private String email;
     private Integer status;
+    private String subPin;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -69,6 +70,9 @@ public class SysUser {
     public void setStatus(Integer status) {
         this.status = status;
     }
+
+    public String getSubPin() { return subPin; }
+    public void setSubPin(String subPin) { this.subPin = subPin; }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

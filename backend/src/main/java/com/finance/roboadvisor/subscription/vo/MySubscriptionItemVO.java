@@ -18,6 +18,8 @@ public class MySubscriptionItemVO {
     private String status;
     private BigDecimal latestNav;
     private BigDecimal latestCumReturn;
+    private BigDecimal investAmount;
+    private BigDecimal currentValue;
     private LocalDateTime subscribedAt;
     private List<SubscriptionVersionAction> pendingVersionActions = new ArrayList<>();
 
@@ -92,6 +94,11 @@ public class MySubscriptionItemVO {
     public void setLatestCumReturn(BigDecimal latestCumReturn) {
         this.latestCumReturn = latestCumReturn;
     }
+
+    public BigDecimal getInvestAmount() { return investAmount; }
+    public void setInvestAmount(BigDecimal investAmount) { this.investAmount = investAmount; }
+    public BigDecimal getCurrentValue() { return currentValue; }
+    public void setCurrentValue(BigDecimal currentValue) { this.currentValue = currentValue; }
 
     public LocalDateTime getSubscribedAt() {
         return subscribedAt;

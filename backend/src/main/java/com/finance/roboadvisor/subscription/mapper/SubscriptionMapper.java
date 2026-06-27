@@ -1,5 +1,6 @@
 package com.finance.roboadvisor.subscription.mapper;
 
+import com.finance.roboadvisor.admin.vo.AdminDashboardVO;
 import com.finance.roboadvisor.subscription.entity.AdvisorProductSubscription;
 import com.finance.roboadvisor.subscription.vo.MySubscriptionItemVO;
 import org.apache.ibatis.annotations.Mapper;
@@ -20,6 +21,10 @@ public interface SubscriptionMapper {
     int updateStatusToActive(@Param("id") Long id);
 
     int updateStatusToCancelled(@Param("id") Long id);
+
+    int updateInvestAmount(@Param("id") Long id,
+                           @Param("investAmount") java.math.BigDecimal investAmount,
+                           @Param("currentValue") java.math.BigDecimal currentValue);
 
     List<AdvisorProductSubscription> selectActiveSubscriptionsByProductId(@Param("productId") Long productId);
 
@@ -43,4 +48,10 @@ public interface SubscriptionMapper {
     Long countRecentWeekByCreatorId(@Param("creatorId") Long creatorId);
 
     Long countByProductId(@Param("productId") Long productId);
+
+    Long countAll();
+
+    List<AdminDashboardVO.ProductSubscriptionVO> selectTopSubscribed(@Param("limit") int limit);
+
+    int cancelByUserId(@Param("userId") Long userId);
 }

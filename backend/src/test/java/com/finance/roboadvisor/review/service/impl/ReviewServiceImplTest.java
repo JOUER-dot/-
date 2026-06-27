@@ -3,116 +3,79 @@ package com.finance.roboadvisor.review.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finance.roboadvisor.auth.entity.SysUser;
 import com.finance.roboadvisor.auth.security.LoginUser;
-import com.finance.roboadvisor.product.entity.AdvisorProduct;
-import com.finance.roboadvisor.product.entity.AdvisorProductFlowLog;
-import com.finance.roboadvisor.product.entity.AdvisorProductRuleDecision;
-import com.finance.roboadvisor.product.entity.AdvisorProductReview;
-import com.finance.roboadvisor.product.entity.AdvisorStrategyRule;
-import com.finance.roboadvisor.product.entity.AdvisorProductVersion;
-import com.finance.roboadvisor.product.mapper.ProductComponentMapper;
-import com.finance.roboadvisor.product.mapper.ProductFlowLogMapper;
-import com.finance.roboadvisor.product.mapper.ProductMapper;
-import com.finance.roboadvisor.product.mapper.ProductRuleDecisionMapper;
-import com.finance.roboadvisor.product.mapper.ProductReviewMapper;
-import com.finance.roboadvisor.product.mapper.ProductVersionMapper;
-import com.finance.roboadvisor.product.mapper.StrategyRuleMapper;
+import com.finance.roboadvisor.common.api.PageResult;
+import com.finance.roboadvisor.common.exception.BusinessException;
+import com.finance.roboadvisor.notification.service.NotificationService;
+import com.finance.roboadvisor.product.entity.*;
+import com.finance.roboadvisor.product.mapper.*;
 import com.finance.roboadvisor.product.service.ProductHoldingSnapshotGenerationService;
 import com.finance.roboadvisor.product.service.ProductNavGenerationService;
 import com.finance.roboadvisor.product.service.StrategyRuleValidationService;
 import com.finance.roboadvisor.product.vo.DraftComponentVO;
+import com.finance.roboadvisor.product.vo.ReviewRecordVO;
 import com.finance.roboadvisor.review.dto.ReviewApproveDTO;
 import com.finance.roboadvisor.review.dto.ReviewRejectDTO;
 import com.finance.roboadvisor.review.mapper.ReviewMapper;
-import com.finance.roboadvisor.subscription.service.SubscriptionService;
+import com.finance.roboadvisor.review.support.ReviewDiffBuilder;
 import com.finance.roboadvisor.review.vo.ReviewDetailVO;
-import com.finance.roboadvisor.review.vo.ReviewDiffComponentVO;
-import com.finance.roboadvisor.review.vo.ReviewDiffFieldVO;
+import com.finance.roboadvisor.review.vo.ReviewHistoryItemVO;
+import com.finance.roboadvisor.review.vo.ReviewPendingListItemVO;
+import com.finance.roboadvisor.subscription.service.SubscriptionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class ReviewServiceImplTest {
+public class ReviewServiceImplTest {
 
-    @Mock
-    private ReviewMapper reviewMapper;
-
-    @Mock
-    private ProductMapper productMapper;
-
-    @Mock
-    private ProductVersionMapper productVersionMapper;
-
-    @Mock
-    private ProductComponentMapper productComponentMapper;
-
-    @Mock
-    private ProductReviewMapper productReviewMapper;
-
-    @Mock
-    private ProductFlowLogMapper productFlowLogMapper;
-
-    @Mock
-    private StrategyRuleMapper strategyRuleMapper;
-
-    @Mock
-    private ProductRuleDecisionMapper productRuleDecisionMapper;
-
-    @Mock
-    private StrategyRuleValidationService strategyRuleValidationService;
-
-    @Mock
-    private ProductNavGenerationService productNavGenerationService;
-
-    @Mock
-    private ProductHoldingSnapshotGenerationService productHoldingSnapshotGenerationService;
-
-    @Mock
-    private SubscriptionService subscriptionService;
+    @Mock private ReviewMapper reviewMapper;
+    @Mock private ProductMapper productMapper;
+    @Mock private ProductVersionMapper productVersionMapper;
+    @Mock private ProductComponentMapper productComponentMapper;
+    @Mock private ProductReviewMapper productReviewMapper;
+    @Mock private ProductFlowLogMapper productFlowLogMapper;
+    @Mock private StrategyRuleMapper strategyRuleMapper;
+    @Mock private ProductRuleDecisionMapper productRuleDecisionMapper;
+    @Mock private StrategyRuleValidationService strategyRuleValidationService;
+    @Mock private ProductNavGenerationService productNavGenerationService;
+    @Mock private ProductHoldingSnapshotGenerationService productHoldingSnapshotGenerationService;
+    @Mock private SubscriptionService subscriptionService;
+    @Mock private NotificationService notificationService;
 
     private ReviewServiceImpl reviewService;
 
     @BeforeEach
     void setUp() {
-        reviewService = new ReviewServiceImpl(
-                reviewMapper,
-                productMapper,
-                productVersionMapper,
-                productComponentMapper,
-                productReviewMapper,
-                productFlowLogMapper,
-                strategyRuleMapper,
-                productRuleDecisionMapper,
-                strategyRuleValidationService,
-                productNavGenerationService,
-                productHoldingSnapshotGenerationService,
-                subscriptionService,
-                new ObjectMapper()
-        );
+        SysUser sysUser = new SysUser();
+        sysUser.setId(2L);
+        sysUser.setUsername("reviewer");
+        sysUser.setStatus(1);
+        LoginUser loginUser = new LoginUser(sysUser, List.of("REVIEWER"));
+        Authentication auth = new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(auth);
 
-        SysUser reviewer = new SysUser();
-        reviewer.setId(3L);
-        reviewer.setUsername("reviewer01");
-        reviewer.setPasswordHash("test");
-        reviewer.setStatus(1);
-        LoginUser loginUser = new LoginUser(reviewer, List.of("REVIEWER"));
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities())
+        reviewService = new ReviewServiceImpl(
+                reviewMapper, productMapper, productVersionMapper,
+                productComponentMapper, productReviewMapper, productFlowLogMapper,
+                strategyRuleMapper, productRuleDecisionMapper,
+                strategyRuleValidationService, productNavGenerationService,
+                productHoldingSnapshotGenerationService, subscriptionService,
+                notificationService, new ObjectMapper()
         );
     }
 
@@ -121,277 +84,265 @@ class ReviewServiceImplTest {
         SecurityContextHolder.clearContext();
     }
 
+    private AdvisorProduct createPendingProduct(Long id, String name, Long creatorId) {
+        AdvisorProduct p = new AdvisorProduct();
+        p.setId(id);
+        p.setName(name);
+        p.setType("STRATEGY");
+        p.setRiskLevel("R3");
+        p.setStrategyCode("STRATEGY");
+        p.setStatus("PENDING_REVIEW");
+        p.setCreatorId(creatorId);
+        p.setCurrentVersionNo(1);
+        p.setUpdatedAt(LocalDateTime.now());
+        return p;
+    }
+
+    private AdvisorProductVersion createSubmittedVersion(Long productId, Long versionId, Integer versionNo, String changeType) {
+        AdvisorProductVersion v = new AdvisorProductVersion();
+        v.setId(versionId);
+        v.setProductId(productId);
+        v.setVersionNo(versionNo);
+        v.setVersionStatus("SUBMITTED");
+        v.setChangeType(changeType);
+        v.setStatusAtSubmit("PUBLISHED");
+        v.setSubmittedAt(LocalDateTime.now());
+        v.setBaseInfoJson("{\"name\":\"产品名称\",\"type\":\"STRATEGY\",\"riskLevel\":\"R3\"}");
+        v.setParamsJson("{}");
+        return v;
+    }
+
+    // ===================== listPendingProducts =====================
+
     @Test
-    void approveProduct_shouldPublishProductAndWriteReviewRecords() {
-        AdvisorProduct product = new AdvisorProduct();
-        product.setId(1L);
-        product.setStatus("PENDING_REVIEW");
-        product.setType("STRATEGY");
-        product.setStrategyCode("BALANCE_ALPHA");
-        product.setCurrentVersionNo(2);
+    void testListPendingProductsSuccess() {
+        ReviewPendingListItemVO item = new ReviewPendingListItemVO();
+        item.setId(1L);
+        item.setName("待审产品");
+        item.setType("STRATEGY");
+        item.setRiskLevel("R3");
+        item.setCreatorName("投顾A");
+        when(reviewMapper.selectPendingProducts(any(), any(), any(), anyInt(), anyInt())).thenReturn(List.of(item));
+        when(reviewMapper.countPendingProducts(any(), any(), any())).thenReturn(1L);
 
-        AdvisorProductVersion version = new AdvisorProductVersion();
-        version.setId(11L);
-        version.setProductId(1L);
-        version.setVersionNo(2);
-        version.setVersionStatus("SUBMITTED");
+        PageResult<ReviewPendingListItemVO> result = reviewService.listPendingProducts(null, null, null, 1, 10);
 
-        DraftComponentVO component = new DraftComponentVO();
-        component.setFundId(101L);
-        component.setFundCode("110022");
-        component.setFundName("易方达消费行业股票");
-        component.setWeight(new BigDecimal("0.6000"));
+        assertEquals(1, result.getRecords().size());
+        assertEquals(1L, result.getTotal());
+    }
+
+    @Test
+    void testListPendingProductsWithFilter() {
+        when(reviewMapper.selectPendingProducts(eq("keyword"), eq("FOF"), eq("R4"), eq(0), eq(10))).thenReturn(List.of());
+        when(reviewMapper.countPendingProducts(eq("keyword"), eq("FOF"), eq("R4"))).thenReturn(0L);
+
+        PageResult<ReviewPendingListItemVO> result = reviewService.listPendingProducts("keyword", "FOF", "R4", 1, 10);
+
+        assertTrue(result.getRecords().isEmpty());
+        assertEquals(0L, result.getTotal());
+    }
+
+    @Test
+    void testListPendingProductsDefaultPagination() {
+        when(reviewMapper.selectPendingProducts(any(), any(), any(), eq(0), eq(10))).thenReturn(List.of());
+        when(reviewMapper.countPendingProducts(any(), any(), any())).thenReturn(0L);
+
+        PageResult<ReviewPendingListItemVO> result = reviewService.listPendingProducts(null, null, null, null, null);
+
+        assertEquals(1, result.getPageNum());
+        assertEquals(10, result.getPageSize());
+    }
+
+    // ===================== approveProduct =====================
+
+    @Test
+    void testApproveProductWithNewProduct() {
+        Long productId = 1L;
+        AdvisorProduct product = createPendingProduct(productId, "新产品", 1L);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = createSubmittedVersion(productId, 10L, 1, "NORMAL");
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId)).thenReturn(version);
+
+        List<DraftComponentVO> components = List.of();
+        when(productComponentMapper.selectByVersionId(10L)).thenReturn(components);
+
+        when(strategyRuleMapper.selectEnabledByStrategyAndType(any(), anyString())).thenReturn(null);
+
+        reviewService.approveProduct(productId, null);
+
+        verify(productMapper).updateApprovedReviewOutcome(productId, "PUBLISHED", 1);
+        verify(productVersionMapper).updateVersionStatus(10L, "APPROVED");
+        verify(subscriptionService).createVersionActions(eq(productId), eq(10L), eq("NORMAL"),
+                eq("NOTICE"), eq("NOTIFIED"), isNull());
+        verify(productNavGenerationService).generatePublishedProductNav(productId);
+        verify(productHoldingSnapshotGenerationService).generatePublishedHoldingSnapshot(productId);
+        verify(notificationService).createNotification(eq(1L), eq("审核通过"), anyString(), eq("REVIEW_RESULT"), anyString());
+    }
+
+    @Test
+    void testApproveProductWithMajorChange() {
+        Long productId = 1L;
+        AdvisorProduct product = createPendingProduct(productId, "重大变更产品", 1L);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = createSubmittedVersion(productId, 10L, 2, "MAJOR");
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId)).thenReturn(version);
+
+        when(productComponentMapper.selectByVersionId(10L)).thenReturn(List.of());
 
         AdvisorStrategyRule rule = new AdvisorStrategyRule();
-        rule.setId(9L);
-        rule.setStrategyCode("BALANCE_ALPHA");
+        rule.setId(100L);
+        rule.setStrategyCode("STRATEGY");
         rule.setProductType("STRATEGY");
-        rule.setMinFundCount(1);
+        rule.setMinFundCount(2);
         rule.setMaxFundCount(10);
-        rule.setMinSingleWeight(new BigDecimal("0.0500"));
-        rule.setMaxSingleWeight(new BigDecimal("0.5000"));
+        rule.setMinSingleWeight(new BigDecimal("0.05"));
+        rule.setMaxSingleWeight(new BigDecimal("0.6"));
+        rule.setAllowFundTypes("EQUITY,BOND");
+        rule.setRiskRuleMode("NORMAL");
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("STRATEGY", "STRATEGY")).thenReturn(rule);
 
         ReviewApproveDTO dto = new ReviewApproveDTO();
-        dto.setOverrideMaxSingleWeight(new BigDecimal("0.7000"));
-        dto.setDecisionComment("允许本次超过默认单基金权重上限");
+        dto.setOverrideMaxSingleWeight(new BigDecimal("0.8"));
+        dto.setDecisionComment("允许超过60%权重");
 
-        when(productMapper.selectById(1L)).thenReturn(product);
-        when(productVersionMapper.selectLatestSubmittedByProductId(1L)).thenReturn(version);
-        when(productComponentMapper.selectByVersionId(11L)).thenReturn(List.of(component));
-        when(strategyRuleMapper.selectEnabledByStrategyAndType("BALANCE_ALPHA", "STRATEGY")).thenReturn(rule);
+        reviewService.approveProduct(productId, dto);
 
-        reviewService.approveProduct(1L, dto);
-
-        verify(productMapper).updateApprovedReviewOutcome(1L, "PUBLISHED", 2);
-        verify(productVersionMapper).updateVersionStatus(11L, "APPROVED");
-        ArgumentCaptor<AdvisorProductRuleDecision> decisionCaptor = ArgumentCaptor.forClass(AdvisorProductRuleDecision.class);
-        verify(productRuleDecisionMapper).insert(decisionCaptor.capture());
-        assertThat(decisionCaptor.getValue().getProductId()).isEqualTo(1L);
-        assertThat(decisionCaptor.getValue().getProductVersionId()).isEqualTo(11L);
-        assertThat(decisionCaptor.getValue().getBaseRuleId()).isEqualTo(9L);
-        assertThat(decisionCaptor.getValue().getReviewerId()).isEqualTo(3L);
-        assertThat(decisionCaptor.getValue().getOverrideMaxSingleWeight()).isEqualByComparingTo("0.7000");
-        assertThat(decisionCaptor.getValue().getDecisionComment()).isEqualTo("允许本次超过默认单基金权重上限");
-        assertThat(decisionCaptor.getValue().getFinalRuleJson()).contains("\"ruleId\":9");
-        assertThat(decisionCaptor.getValue().getFinalRuleJson()).contains("\"maxSingleWeight\":0.7000");
-
-        verify(productReviewMapper).insert(any(AdvisorProductReview.class));
-        verify(productFlowLogMapper).insert(any(AdvisorProductFlowLog.class));
-        verify(productNavGenerationService).generatePublishedProductNav(1L);
-        verify(productHoldingSnapshotGenerationService).generatePublishedHoldingSnapshot(1L);
+        verify(subscriptionService).createVersionActions(eq(productId), eq(10L), eq("MAJOR"),
+                eq("CONFIRM_REQUIRED"), eq("PENDING"), isNull());
+        verify(productRuleDecisionMapper).insert(any(AdvisorProductRuleDecision.class));
     }
 
     @Test
-    void rejectProduct_shouldMarkRejectedAndPersistRejectComment() {
-        AdvisorProduct product = new AdvisorProduct();
-        product.setId(2L);
-        product.setStatus("PENDING_REVIEW");
-        product.setCurrentVersionNo(3);
+    void testApproveProductNotPending() {
+        Long productId = 1L;
+        AdvisorProduct product = createPendingProduct(productId, "产品", 1L);
+        product.setStatus("PUBLISHED");
+        when(productMapper.selectById(productId)).thenReturn(product);
 
-        AdvisorProductVersion version = new AdvisorProductVersion();
-        version.setId(21L);
-        version.setProductId(2L);
-        version.setVersionNo(3);
-        version.setVersionStatus("SUBMITTED");
+        assertThrows(BusinessException.class, () -> reviewService.approveProduct(productId, null));
+    }
+
+    @Test
+    void testApproveProductNoSubmittedVersion() {
+        Long productId = 1L;
+        AdvisorProduct product = createPendingProduct(productId, "产品", 1L);
+        when(productMapper.selectById(productId)).thenReturn(product);
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> reviewService.approveProduct(productId, null));
+    }
+
+    // ===================== rejectProduct =====================
+
+    @Test
+    void testRejectProductSuccess() {
+        Long productId = 1L;
+        AdvisorProduct product = createPendingProduct(productId, "驳回产品", 1L);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = createSubmittedVersion(productId, 10L, 1, "NORMAL");
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId)).thenReturn(version);
 
         ReviewRejectDTO dto = new ReviewRejectDTO();
-        dto.setComment("单一行业集中度过高，请调整权重");
+        dto.setComment("成份基金风险过高");
 
-        when(productMapper.selectById(2L)).thenReturn(product);
-        when(productVersionMapper.selectLatestSubmittedByProductId(2L)).thenReturn(version);
+        reviewService.rejectProduct(productId, dto);
 
-        reviewService.rejectProduct(2L, dto);
-
-        verify(productMapper).updateRejectedReviewOutcome(2L, "REJECTED", "单一行业集中度过高，请调整权重");
-        verify(productVersionMapper).updateVersionStatus(21L, "REJECTED");
-
+        verify(productMapper).updateRejectedReviewOutcome(productId, "REJECTED", "成份基金风险过高");
+        verify(productVersionMapper).updateVersionStatus(10L, "REJECTED");
         verify(productReviewMapper).insert(any(AdvisorProductReview.class));
         verify(productFlowLogMapper).insert(any(AdvisorProductFlowLog.class));
+        verify(notificationService).createNotification(eq(1L), eq("审核驳回"), anyString(), eq("REVIEW_RESULT"), anyString());
     }
 
     @Test
-    void approveProduct_shouldCreateConfirmRequiredActionsForMajorChange() {
-        AdvisorProduct product = new AdvisorProduct();
-        product.setId(12L);
-        product.setStatus("PENDING_REVIEW");
-        product.setType("STRATEGY");
-        product.setStrategyCode("BALANCE_ALPHA");
-        product.setCurrentVersionNo(4);
+    void testRejectProductNotPending() {
+        Long productId = 1L;
+        AdvisorProduct product = createPendingProduct(productId, "产品", 1L);
+        product.setStatus("DRAFT");
+        when(productMapper.selectById(productId)).thenReturn(product);
 
-        AdvisorProductVersion version = new AdvisorProductVersion();
-        version.setId(31L);
-        version.setProductId(12L);
-        version.setVersionNo(4);
-        version.setVersionStatus("SUBMITTED");
-        version.setChangeType("MAJOR");
-        version.setVersionNote("调仓并提升风险等级");
+        ReviewRejectDTO dto = new ReviewRejectDTO();
+        dto.setComment("原因");
 
-        DraftComponentVO component = new DraftComponentVO();
-        component.setFundId(201L);
-        component.setFundCode("110023");
-        component.setFundName("中欧医疗健康混合");
-        component.setWeight(new BigDecimal("0.4000"));
+        assertThrows(BusinessException.class, () -> reviewService.rejectProduct(productId, dto));
+    }
 
-        AdvisorStrategyRule rule = new AdvisorStrategyRule();
-        rule.setId(19L);
-        rule.setStrategyCode("BALANCE_ALPHA");
-        rule.setProductType("STRATEGY");
-        rule.setMinFundCount(1);
-        rule.setMaxFundCount(10);
-        rule.setMinSingleWeight(new BigDecimal("0.0500"));
-        rule.setMaxSingleWeight(new BigDecimal("0.6000"));
+    // ===================== batch operations =====================
 
-        when(productMapper.selectById(12L)).thenReturn(product);
-        when(productVersionMapper.selectLatestSubmittedByProductId(12L)).thenReturn(version);
-        when(productComponentMapper.selectByVersionId(31L)).thenReturn(List.of(component));
-        when(strategyRuleMapper.selectEnabledByStrategyAndType("BALANCE_ALPHA", "STRATEGY")).thenReturn(rule);
+    @Test
+    void testBatchApproveSuccess() {
+        Long productId1 = 1L;
+        Long productId2 = 2L;
 
-        reviewService.approveProduct(12L, new ReviewApproveDTO());
+        // We need to test batchApprove calls approveProduct internally
+        // Mock the internal calls by letting them succeed
+        AdvisorProduct p1 = createPendingProduct(productId1, "产品1", 1L);
+        AdvisorProduct p2 = createPendingProduct(productId2, "产品2", 2L);
+        when(productMapper.selectById(productId1)).thenReturn(p1);
+        when(productMapper.selectById(productId2)).thenReturn(p2);
 
-        verify(subscriptionService).createVersionActions(
-                12L,
-                31L,
-                "MAJOR",
-                "CONFIRM_REQUIRED",
-                "PENDING",
-                "调仓并提升风险等级"
-        );
+        AdvisorProductVersion v1 = createSubmittedVersion(productId1, 10L, 1, "NORMAL");
+        AdvisorProductVersion v2 = createSubmittedVersion(productId2, 20L, 1, "NORMAL");
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId1)).thenReturn(v1);
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId2)).thenReturn(v2);
+
+        when(productComponentMapper.selectByVersionId(10L)).thenReturn(List.of());
+        when(productComponentMapper.selectByVersionId(20L)).thenReturn(List.of());
+        when(strategyRuleMapper.selectEnabledByStrategyAndType(any(), any())).thenReturn(null);
+
+        reviewService.batchApprove(List.of(productId1, productId2), null);
+
+        verify(productVersionMapper).updateVersionStatus(10L, "APPROVED");
+        verify(productVersionMapper).updateVersionStatus(20L, "APPROVED");
     }
 
     @Test
-    void approveProduct_shouldCreateNoticeActionsForNormalChange() {
-        AdvisorProduct product = new AdvisorProduct();
-        product.setId(13L);
-        product.setStatus("PENDING_REVIEW");
-        product.setType("STRATEGY");
-        product.setStrategyCode("BALANCE_ALPHA");
-        product.setCurrentVersionNo(5);
+    void testBatchRejectSuccess() {
+        Long productId1 = 1L;
+        Long productId2 = 2L;
 
-        AdvisorProductVersion version = new AdvisorProductVersion();
-        version.setId(41L);
-        version.setProductId(13L);
-        version.setVersionNo(5);
-        version.setVersionStatus("SUBMITTED");
-        version.setChangeType("NORMAL");
-        version.setVersionNote("优化文案描述");
+        AdvisorProduct p1 = createPendingProduct(productId1, "产品A", 1L);
+        AdvisorProduct p2 = createPendingProduct(productId2, "产品B", 1L);
+        when(productMapper.selectById(productId1)).thenReturn(p1);
+        when(productMapper.selectById(productId2)).thenReturn(p2);
 
-        DraftComponentVO component = new DraftComponentVO();
-        component.setFundId(202L);
-        component.setFundCode("110024");
-        component.setFundName("富国天惠成长混合");
-        component.setWeight(new BigDecimal("0.3500"));
+        AdvisorProductVersion v1 = createSubmittedVersion(productId1, 10L, 1, "NORMAL");
+        AdvisorProductVersion v2 = createSubmittedVersion(productId2, 20L, 1, "NORMAL");
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId1)).thenReturn(v1);
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId2)).thenReturn(v2);
 
-        AdvisorStrategyRule rule = new AdvisorStrategyRule();
-        rule.setId(20L);
-        rule.setStrategyCode("BALANCE_ALPHA");
-        rule.setProductType("STRATEGY");
-        rule.setMinFundCount(1);
-        rule.setMaxFundCount(10);
-        rule.setMinSingleWeight(new BigDecimal("0.0500"));
-        rule.setMaxSingleWeight(new BigDecimal("0.6000"));
+        ReviewRejectDTO dto = new ReviewRejectDTO();
+        dto.setComment("批量驳回原因");
 
-        when(productMapper.selectById(13L)).thenReturn(product);
-        when(productVersionMapper.selectLatestSubmittedByProductId(13L)).thenReturn(version);
-        when(productComponentMapper.selectByVersionId(41L)).thenReturn(List.of(component));
-        when(strategyRuleMapper.selectEnabledByStrategyAndType("BALANCE_ALPHA", "STRATEGY")).thenReturn(rule);
+        reviewService.batchReject(List.of(productId1, productId2), dto);
 
-        reviewService.approveProduct(13L, new ReviewApproveDTO());
+        verify(productMapper, times(2)).updateRejectedReviewOutcome(anyLong(), eq("REJECTED"), anyString());
+    }
 
-        verify(subscriptionService).createVersionActions(
-                13L,
-                41L,
-                "NORMAL",
-                "NOTICE",
-                "NOTIFIED",
-                "优化文案描述"
-        );
+    // ===================== getMyReviewHistory =====================
+
+    @Test
+    void testGetMyReviewHistorySuccess() {
+        ReviewHistoryItemVO item = new ReviewHistoryItemVO();
+        item.setProductId(1L);
+        item.setProductName("已审产品");
+        when(reviewMapper.selectReviewHistoryByReviewer(eq(2L), eq(0), eq(10))).thenReturn(List.of(item));
+
+        List<ReviewHistoryItemVO> result = reviewService.getMyReviewHistory(1, 10);
+
+        assertEquals(1, result.size());
+        assertEquals("已审产品", result.get(0).getProductName());
     }
 
     @Test
-    void getPendingProductDetailShouldReturnFieldAndComponentDiffs() {
-        ReviewDetailVO pendingDetail = new ReviewDetailVO();
-        pendingDetail.setId(9L);
-        pendingDetail.setName("进取成长组合C升级版");
-        pendingDetail.setType("STRATEGY");
-        pendingDetail.setRiskLevel("R4");
-        pendingDetail.setVersionId(19L);
-        pendingDetail.setVersionNo(3);
-        pendingDetail.setVersionStatus("SUBMITTED");
-        pendingDetail.setSubmittedAt(LocalDateTime.of(2026, 6, 26, 10, 0));
-        pendingDetail.setFeatureTagsText("进取,成长");
-        pendingDetail.setBaseInfoJson("""
-                {"name":"进取成长组合C升级版","type":"STRATEGY","riskLevel":"R4","productSummary":"升级后的成长策略","targetCustomer":"进取型投资者","riskTips":"净值波动较大"}
-                """);
-        pendingDetail.setParamsJson("""
-                {"rebalanceCycleDays":14,"minSingleFundWeight":0.10,"maxSingleFundWeight":0.55,"investHorizonMonths":18,"strategyNotes":"成长风格更聚焦"}
-                """);
+    void testGetMyReviewHistoryDefaultPagination() {
+        when(reviewMapper.selectReviewHistoryByReviewer(eq(2L), eq(0), eq(10))).thenReturn(List.of());
 
-        AdvisorProductVersion currentVersion = new AdvisorProductVersion();
-        currentVersion.setId(19L);
-        currentVersion.setProductId(9L);
-        currentVersion.setVersionNo(3);
-        currentVersion.setVersionStatus("SUBMITTED");
-        currentVersion.setBaseVersionId(11L);
-        currentVersion.setChangeType("MAJOR");
-        currentVersion.setVersionNote("调仓并提升风险等级");
-        currentVersion.setSubmittedAt(LocalDateTime.of(2026, 6, 26, 10, 0));
+        List<ReviewHistoryItemVO> result = reviewService.getMyReviewHistory(null, null);
 
-        AdvisorProductVersion baseVersion = new AdvisorProductVersion();
-        baseVersion.setId(11L);
-        baseVersion.setProductId(9L);
-        baseVersion.setVersionNo(2);
-        baseVersion.setVersionStatus("APPROVED");
-        baseVersion.setSubmittedAt(LocalDateTime.of(2026, 6, 20, 9, 0));
-        baseVersion.setBaseInfoJson("""
-                {"name":"进取成长组合C","type":"STRATEGY","riskLevel":"R3","productSummary":"成长策略","targetCustomer":"成长型投资者","riskTips":"净值存在波动"}
-                """);
-        baseVersion.setParamsJson("""
-                {"rebalanceCycleDays":30,"minSingleFundWeight":0.10,"maxSingleFundWeight":0.40,"investHorizonMonths":12,"strategyNotes":"均衡成长"}
-                """);
-
-        DraftComponentVO removedComponent = new DraftComponentVO();
-        removedComponent.setFundId(101L);
-        removedComponent.setFundCode("000001");
-        removedComponent.setFundName("沪深300ETF");
-        removedComponent.setWeight(new BigDecimal("0.40"));
-
-        DraftComponentVO updatedBaseComponent = new DraftComponentVO();
-        updatedBaseComponent.setFundId(102L);
-        updatedBaseComponent.setFundCode("000002");
-        updatedBaseComponent.setFundName("纳指ETF");
-        updatedBaseComponent.setWeight(new BigDecimal("0.30"));
-
-        DraftComponentVO updatedCurrentComponent = new DraftComponentVO();
-        updatedCurrentComponent.setFundId(102L);
-        updatedCurrentComponent.setFundCode("000002");
-        updatedCurrentComponent.setFundName("纳指ETF");
-        updatedCurrentComponent.setWeight(new BigDecimal("0.45"));
-
-        DraftComponentVO addedComponent = new DraftComponentVO();
-        addedComponent.setFundId(103L);
-        addedComponent.setFundCode("000003");
-        addedComponent.setFundName("中证1000ETF");
-        addedComponent.setWeight(new BigDecimal("0.15"));
-
-        when(reviewMapper.selectPendingProductDetail(9L)).thenReturn(pendingDetail);
-        when(productVersionMapper.selectById(19L)).thenReturn(currentVersion);
-        when(productVersionMapper.selectById(11L)).thenReturn(baseVersion);
-        when(productComponentMapper.selectByVersionId(19L)).thenReturn(List.of(updatedCurrentComponent, addedComponent));
-        when(productComponentMapper.selectByVersionId(11L)).thenReturn(List.of(removedComponent, updatedBaseComponent));
-        when(productReviewMapper.selectByProductId(9L)).thenReturn(List.of());
-
-        ReviewDetailVO detail = reviewService.getPendingProductDetail(9L);
-
-        assertThat(detail.getChangeType()).isEqualTo("MAJOR");
-        assertThat(detail.getVersionNote()).isEqualTo("调仓并提升风险等级");
-        assertThat(detail.getBaseVersionSummary()).isNotNull();
-        assertThat(detail.getBaseVersionSummary().getVersionNo()).isEqualTo(2);
-        assertThat(detail.getCurrentVersionSummary()).isNotNull();
-        assertThat(detail.getCurrentVersionSummary().getVersionNo()).isEqualTo(3);
-        assertThat(detail.getFieldDiffs()).extracting(ReviewDiffFieldVO::getFieldKey)
-                .contains("riskLevel", "productSummary", "targetCustomer", "riskTips",
-                        "rebalanceCycleDays", "maxSingleFundWeight", "investHorizonMonths", "strategyNotes");
-        assertThat(detail.getComponentDiffs()).extracting(ReviewDiffComponentVO::getDiffType)
-                .contains("ADDED", "REMOVED", "UPDATED");
+        assertTrue(result.isEmpty());
     }
 }

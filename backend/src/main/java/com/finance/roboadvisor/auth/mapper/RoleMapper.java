@@ -12,4 +12,6 @@ public interface RoleMapper {
     SysRole selectByRoleCode(@Param("roleCode") String roleCode);
 
     List<SysRole> selectRolesByUserId(@Param("userId") Long userId);
+
+    Long countUsersByRoleCode(@Param("roleCode") String roleCode);
 }

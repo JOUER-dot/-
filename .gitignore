@@ -9,6 +9,14 @@ backend/target/
 .idea/
 .vscode/
 
+# env files with secrets
+.env
+.env.local
+.env.*.local
+
+# uploads
+.uploads/
+
 # logs
 *.log
 

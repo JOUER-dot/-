@@ -1,5 +1,6 @@
 package com.finance.roboadvisor.product.mapper;
 
+import com.finance.roboadvisor.admin.vo.AdminDashboardVO;
 import com.finance.roboadvisor.product.entity.AdvisorProductFlowLog;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -14,4 +15,9 @@ public interface ProductFlowLogMapper {
     List<AdvisorProductFlowLog> selectByProductId(@Param("productId") Long productId);
 
     int deleteByProductId(@Param("productId") Long productId);
+
+    List<AdminDashboardVO.RecentChangeVO> selectRecent(@Param("limit") int limit);
+
+    List<AdminDashboardVO.RecentChangeVO> selectRecentByOperator(@Param("operatorId") Long operatorId,
+                                                                  @Param("limit") int limit);
 }

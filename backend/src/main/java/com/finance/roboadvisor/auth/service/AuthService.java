@@ -20,4 +20,10 @@ public interface AuthService {
     void changePassword(ChangePasswordDTO dto);
 
     void updateProfile(UpdateProfileDTO dto);
+
+    void deleteAccount();
+
+    void setPin(String pin);
+
+    void verifyPassword(String password);
 }

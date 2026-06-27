@@ -14,6 +14,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping
 public class SubscriptionController {
@@ -25,8 +29,12 @@ public class SubscriptionController {
     }
 
     @PostMapping("/api/public/advisor-products/{id}/subscribe")
-    public ApiResult<Void> subscribe(@PathVariable("id") Long productId) {
-        subscriptionService.subscribe(productId);
+    public ApiResult<Void> subscribe(@PathVariable("id") Long productId,
+                                     @RequestBody(required = false) Map<String, Object> body) {
+        BigDecimal amount = body != null && body.get("amount") != null
+                ? new BigDecimal(body.get("amount").toString())
+                : null;
+        subscriptionService.subscribe(productId, amount);
         return ApiResult.success("订阅成功");
     }
 

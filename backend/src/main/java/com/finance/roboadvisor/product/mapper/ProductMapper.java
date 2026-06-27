@@ -44,4 +44,8 @@ public interface ProductMapper {
                         @Param("keyword") String keyword);
 
     int deleteById(@Param("id") Long id);
+
+    Long countAll();
+
+    Long countByStatus(@Param("status") String status);
 }

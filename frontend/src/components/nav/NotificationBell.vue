@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElNotification } from 'element-plus'
+import { Bell } from '@element-plus/icons-vue'
 import { getUnreadCount, markAllAsRead } from '@/api/notification'
 
 const router = useRouter()
@@ -51,7 +52,7 @@ onUnmounted(() => {
 <template>
   <div class="notification-bell" @click="handleClick">
     <el-badge :value="displayCount" :hidden="unreadCount === 0" :max="99">
-      <el-button :icon="'Bell'" circle size="small" />
+      <el-button :icon="Bell" circle size="small" />
     </el-badge>
   </div>
 </template>

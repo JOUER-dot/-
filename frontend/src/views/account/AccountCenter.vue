@@ -1,22 +1,34 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import PageHeader from '@/components/common/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
-import { updateProfile } from '@/api/auth'
+import { updateProfile, changePassword, deleteAccount, setPin, verifyPassword } from '@/api/auth'
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const savingProfile = ref(false)
+const savingPassword = ref(false)
+const savingPin = ref(false)
+const showPinSetup = ref(false)
+const pinLoginPass = ref('')
+const newPin = ref('')
+const confirmPin = ref('')
 const loading = ref(true)
 
 const profileForm = reactive({
   nickname: '',
   phone: '',
   email: ''
+})
+
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
 })
 
 const initForm = () => {
@@ -40,9 +52,66 @@ const handleSaveProfile = async () => {
   }
 }
 
+const handleChangePassword = async () => {
+  if (!passwordForm.oldPassword) { ElMessage.warning('请输入当前密码'); return }
+  if (passwordForm.newPassword.length < 6) { ElMessage.warning('新密码长度不能小于6位'); return }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) { ElMessage.warning('两次密码输入不一致'); return }
+  savingPassword.value = true
+  try {
+    await changePassword(passwordForm)
+    ElMessage.success('密码修改成功')
+    passwordForm.oldPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+  } catch {
+    ElMessage.error('密码修改失败')
+  } finally {
+    savingPassword.value = false
+  }
+}
+
+const openPinSetup = () => {
+  pinLoginPass.value = ''
+  newPin.value = ''
+  confirmPin.value = ''
+  showPinSetup.value = true
+}
+
+const savePin = async () => {
+  if (!pinLoginPass.value) { ElMessage.warning('请输入登录密码验证'); return }
+  if (!/^\d{6}$/.test(newPin.value)) { ElMessage.warning('交易密码必须为6位数字'); return }
+  if (newPin.value !== confirmPin.value) { ElMessage.warning('两次交易密码输入不一致'); return }
+  try {
+    await verifyPassword(pinLoginPass.value)
+    await setPin(newPin.value)
+    ElMessage.success('交易密码设置成功')
+    showPinSetup.value = false
+  } catch (e: any) {
+    ElMessage.error(e?.message || '设置失败')
+  }
+}
+
 const handleLogout = async () => {
   await userStore.logout()
   await router.replace('/login')
+}
+
+const handleDeleteAccount = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确认注销账号吗？注销后账号将无法恢复。\n若有已上架产品，请先下架后再注销。',
+      '注销账号',
+      { confirmButtonText: '确认注销', confirmButtonClass: 'el-button--danger', type: 'warning' }
+    )
+  } catch { return }
+  try {
+    await deleteAccount()
+    ElMessage.success('账号已注销')
+    await userStore.logout(false)
+    await router.replace('/login')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '注销失败')
+  }
 }
 
 onMounted(() => {
@@ -109,6 +178,61 @@ onMounted(() => {
           </div>
         </SectionCard>
       </div>
+
+      <!-- 安全设置 -->
+      <SectionCard title="安全设置">
+        <el-form :model="passwordForm" label-position="top">
+          <el-form-item label="当前密码">
+            <el-input v-model="passwordForm.oldPassword" type="password" show-password placeholder="请输入当前密码" />
+          </el-form-item>
+          <el-form-item label="新密码">
+            <el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="6~20位，区分大小写" />
+          </el-form-item>
+          <el-form-item label="确认新密码">
+            <el-input v-model="passwordForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="savingPassword" @click="handleChangePassword">修改密码</el-button>
+          </el-form-item>
+        </el-form>
+        <el-divider />
+        <div v-if="userStore.hasAnyRole(['USER'])" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:600;font-size:14px;">交易密码</div>
+            <div style="font-size:12px;color:var(--color-text-3);margin-top:2px;">用于订阅产品时的安全验证</div>
+          </div>
+          <el-button size="small" @click="openPinSetup">设置交易密码</el-button>
+        </div>
+      </SectionCard>
+
+      <!-- 危险操作 -->
+      <SectionCard title="危险操作">
+        <el-alert title="注销账号后数据将无法恢复，请谨慎操作" type="warning" :closable="false" show-icon />
+        <div style="margin-top:12px">
+          <el-button type="danger" plain @click="handleDeleteAccount">注销账号</el-button>
+        </div>
+      </SectionCard>
+
+      <!-- 交易密码设置弹窗 -->
+      <el-dialog v-model="showPinSetup" title="设置交易密码" width="400px">
+        <el-alert title="交易密码设置后不可修改，请牢记" type="warning" :closable="false" show-icon style="margin-bottom:16px" />
+        <p style="margin:0 0 16px;color:var(--color-text-2);font-size:13px;">请先验证登录密码，然后设置6位数字交易密码</p>
+        <el-form label-position="top">
+          <el-form-item label="登录密码">
+            <el-input v-model="pinLoginPass" type="password" show-password placeholder="请输入登录密码验证身份" size="large" />
+          </el-form-item>
+          <el-form-item label="交易密码（6位数字）">
+            <el-input v-model="newPin" maxlength="6" placeholder="请设置6位数字" size="large" />
+          </el-form-item>
+          <el-form-item label="确认交易密码">
+            <el-input v-model="confirmPin" maxlength="6" placeholder="请再次输入6位数字" size="large" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showPinSetup = false">取消</el-button>
+          <el-button type="primary" @click="savePin">保存</el-button>
+        </template>
+      </el-dialog>
 
       <!-- 快捷操作 -->
       <SectionCard title="快捷操作">

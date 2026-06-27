@@ -15,9 +15,12 @@ import ReviewDetail from '@/views/review/ReviewDetail.vue'
 import ReviewHistory from '@/views/review/ReviewHistory.vue'
 import AdvisorZoneList from '@/views/public/AdvisorZoneList.vue'
 import AdvisorZoneDetail from '@/views/public/AdvisorZoneDetail.vue'
+import CompareProducts from '@/views/public/CompareProducts.vue'
+import PaymentPage from '@/views/public/PaymentPage.vue'
 import MySubscriptions from '@/views/public/MySubscriptions.vue'
 import UserDashboard from '@/views/common/UserDashboard.vue'
 import Notifications from '@/views/common/Notifications.vue'
+import TransactionHistory from '@/views/common/TransactionHistory.vue'
 import AdminDashboard from '@/views/admin/AdminDashboard.vue'
 import AdminUsers from '@/views/admin/AdminUsers.vue'
 
@@ -64,6 +67,17 @@ const router = createRouter({
             requiresAuth: true,
             title: '消息通知',
             description: '系统通知'
+          }
+        },
+        {
+          path: 'transactions',
+          name: 'TransactionHistory',
+          component: TransactionHistory,
+          meta: {
+            requiresAuth: true,
+            roles: ['USER'],
+            title: '交易记录',
+            description: '查看交易记录'
           }
         },
         {
@@ -198,6 +212,15 @@ const router = createRouter({
             title: '产品详情',
             description: '用户端产品详情页'
           }
+        },
+        {
+          path: 'compare',
+          name: 'CompareProducts',
+          component: CompareProducts,
+          meta: {
+            title: '产品对比',
+            description: '产品对比页'
+          }
         }
       ]
     },
@@ -218,6 +241,12 @@ const router = createRouter({
       name: 'Register',
       component: Register,
       meta: { guestOnly: true }
+    },
+    {
+      path: '/payment/:id',
+      name: 'Payment',
+      component: PaymentPage,
+      meta: { title: '确认支付' }
     }
   ]
 })

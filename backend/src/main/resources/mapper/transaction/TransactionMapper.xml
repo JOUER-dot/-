@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.transaction.mapper.TransactionMapper">
+    <insert id="insert" parameterType="com.finance.roboadvisor.transaction.entity.TransactionRecord" useGeneratedKeys="true" keyProperty="id">
+        insert into transaction_record (user_id, product_id, product_name, type, amount, status)
+        values (#{userId}, #{productId}, #{productName}, #{type}, #{amount}, #{status})
+    </insert>
+    <select id="selectByUserId" resultType="com.finance.roboadvisor.transaction.entity.TransactionRecord">
+        select id, user_id as userId, product_id as productId, product_name as productName,
+               type, amount, status, created_at as createdAt
+        from transaction_record where user_id = #{userId}
+        order by created_at desc limit #{pageSize} offset #{offset}
+    </select>
+    <select id="countByUserId" resultType="long">
+        select count(1) from transaction_record where user_id = #{userId}
+    </select>
+</mapper>

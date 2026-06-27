@@ -44,8 +44,8 @@ const renderChart = async () => {
   const dates = filteredData.value.map((i) => i.navDate)
   const navs = filteredData.value.map((i) => Number(i.nav))
   const returns = filteredData.value.map((i) => Number(i.cumReturn || 0))
-  const lineColor = isPositive.value ? '#1e9e62' : '#c53b32'
-  const areaColor = isPositive.value ? 'rgba(30,158,98,' : 'rgba(197,59,50,'
+  const lineColor = isPositive.value ? '#c53b32' : '#1e9e62'
+  const areaColor = isPositive.value ? 'rgba(197,59,50,' : 'rgba(30,158,98,'
 
   chartInstance.setOption({
     tooltip: {
@@ -61,7 +61,7 @@ const renderChart = async () => {
         let html = `<div style="font-weight:600;margin-bottom:4px">${p.axisValue}</div>`
         html += `<div>净值：<strong>${p.value.toFixed(4)}</strong></div>`
         if (cumRet !== null) {
-          const cls = cumRet >= 0 ? 'color:#1e9e62' : 'color:#c53b32'
+          const cls = cumRet >= 0 ? 'color:#c53b32' : 'color:#1e9e62'
           html += `<div>累计收益：<strong style="${cls}">${(cumRet * 100).toFixed(2)}%</strong></div>`
         }
         return html

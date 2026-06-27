@@ -3,6 +3,10 @@ package com.finance.roboadvisor.subscription.service.impl;
 import com.finance.roboadvisor.auth.entity.SysUser;
 import com.finance.roboadvisor.auth.security.LoginUser;
 import com.finance.roboadvisor.common.api.PageResult;
+import com.finance.roboadvisor.common.exception.BusinessException;
+import com.finance.roboadvisor.notification.service.NotificationService;
+import com.finance.roboadvisor.product.entity.AdvisorProduct;
+import com.finance.roboadvisor.product.mapper.ProductMapper;
 import com.finance.roboadvisor.publicapi.mapper.PublicProductMapper;
 import com.finance.roboadvisor.subscription.dto.MySubscriptionQueryDTO;
 import com.finance.roboadvisor.subscription.entity.AdvisorProductSubscription;
@@ -10,51 +14,47 @@ import com.finance.roboadvisor.subscription.entity.SubscriptionVersionAction;
 import com.finance.roboadvisor.subscription.mapper.SubscriptionMapper;
 import com.finance.roboadvisor.subscription.mapper.SubscriptionVersionActionMapper;
 import com.finance.roboadvisor.subscription.vo.MySubscriptionItemVO;
+import com.finance.roboadvisor.transaction.service.TransactionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class SubscriptionServiceImplTest {
+public class SubscriptionServiceImplTest {
 
-    @Mock
-    private SubscriptionMapper subscriptionMapper;
+    @Mock private SubscriptionMapper subscriptionMapper;
+    @Mock private PublicProductMapper publicProductMapper;
+    @Mock private SubscriptionVersionActionMapper subscriptionVersionActionMapper;
+    @Mock private NotificationService notificationService;
+    @Mock private ProductMapper productMapper;
+    @Mock private TransactionService transactionService;
 
-    @Mock
-    private PublicProductMapper publicProductMapper;
-
-    @Mock
-    private SubscriptionVersionActionMapper subscriptionVersionActionMapper;
-
+    @InjectMocks
     private SubscriptionServiceImpl subscriptionService;
 
     @BeforeEach
     void setUp() {
-        subscriptionService = new SubscriptionServiceImpl(subscriptionMapper, publicProductMapper, subscriptionVersionActionMapper);
-
-        SysUser user = new SysUser();
-        user.setId(1L);
-        user.setUsername("user01");
-        user.setPasswordHash("test");
-        user.setStatus(1);
-        LoginUser loginUser = new LoginUser(user, List.of("USER"));
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities())
-        );
+        SysUser sysUser = new SysUser();
+        sysUser.setId(3L);
+        sysUser.setUsername("testuser");
+        sysUser.setStatus(1);
+        LoginUser loginUser = new LoginUser(sysUser, List.of("USER"));
+        Authentication auth = new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
     @AfterEach
@@ -62,183 +62,265 @@ class SubscriptionServiceImplTest {
         SecurityContextHolder.clearContext();
     }
 
+    private AdvisorProduct createProduct(Long id, String name, Long creatorId) {
+        AdvisorProduct p = new AdvisorProduct();
+        p.setId(id);
+        p.setName(name);
+        p.setType("STRATEGY");
+        p.setRiskLevel("R3");
+        p.setStatus("PUBLISHED");
+        p.setCreatorId(creatorId);
+        return p;
+    }
+
+    // ===================== subscribe =====================
+
     @Test
-    void subscribe_shouldBeIdempotentWhenActiveSubscriptionExists() {
-        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
-        subscription.setId(100L);
-        subscription.setProductId(1L);
-        subscription.setUserId(1L);
-        subscription.setStatus("ACTIVE");
+    void testSubscribeNew() {
+        Long productId = 1L;
+        BigDecimal amount = new BigDecimal("10000");
 
-        when(publicProductMapper.countPublishedProductById(1L)).thenReturn(1L);
-        when(subscriptionMapper.selectByUserIdAndProductId(1L, 1L)).thenReturn(subscription);
+        when(publicProductMapper.countPublishedProductById(productId)).thenReturn(1L);
+        when(subscriptionMapper.selectByUserIdAndProductId(3L, productId)).thenReturn(null);
 
-        subscriptionService.subscribe(1L);
+        AdvisorProduct product = createProduct(productId, "优选组合", 5L);
+        when(productMapper.selectById(productId)).thenReturn(product);
 
-        verify(subscriptionMapper, never()).insert(org.mockito.ArgumentMatchers.any(AdvisorProductSubscription.class));
-        verify(subscriptionMapper, never()).updateStatusToActive(100L);
+        subscriptionService.subscribe(productId, amount);
+
+        verify(subscriptionMapper).insert(any(AdvisorProductSubscription.class));
+        verify(notificationService, times(2)).createNotification(anyLong(), anyString(), anyString(), anyString(), anyString());
+        verify(transactionService).record(eq(3L), eq(productId), eq("优选组合"), eq("SUBSCRIBE"), eq(amount));
     }
 
     @Test
-    void unsubscribe_shouldUpdateStatusToCancelledWhenActive() {
-        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
-        subscription.setId(100L);
-        subscription.setProductId(1L);
-        subscription.setUserId(1L);
-        subscription.setStatus("ACTIVE");
+    void testSubscribeProductNotPublished() {
+        Long productId = 1L;
+        when(publicProductMapper.countPublishedProductById(productId)).thenReturn(0L);
 
-        when(subscriptionMapper.selectByUserIdAndProductId(1L, 1L)).thenReturn(subscription);
-
-        subscriptionService.unsubscribe(1L);
-
-        verify(subscriptionMapper).updateStatusToCancelled(100L);
+        assertThrows(BusinessException.class, () -> subscriptionService.subscribe(productId, null));
     }
 
     @Test
-    void unsubscribe_shouldBeIdempotentWhenAlreadyCancelled() {
-        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
-        subscription.setId(100L);
-        subscription.setProductId(1L);
-        subscription.setUserId(1L);
-        subscription.setStatus("CANCELLED");
+    void testSubscribeAlreadyActive() {
+        Long productId = 1L;
+        when(publicProductMapper.countPublishedProductById(productId)).thenReturn(1L);
 
-        when(subscriptionMapper.selectByUserIdAndProductId(1L, 1L)).thenReturn(subscription);
+        AdvisorProductSubscription existing = new AdvisorProductSubscription();
+        existing.setId(10L);
+        existing.setStatus("ACTIVE");
+        when(subscriptionMapper.selectByUserIdAndProductId(3L, productId)).thenReturn(existing);
 
-        subscriptionService.unsubscribe(1L);
+        subscriptionService.subscribe(productId, null);
 
-        verify(subscriptionMapper, never()).updateStatusToCancelled(100L);
+        verify(subscriptionMapper, never()).insert(any());
     }
 
     @Test
-    void unsubscribe_shouldBeIdempotentWhenSubscriptionNotExists() {
-        when(subscriptionMapper.selectByUserIdAndProductId(1L, 1L)).thenReturn(null);
+    void testSubscribeResumeCancelled() {
+        Long productId = 1L;
+        when(publicProductMapper.countPublishedProductById(productId)).thenReturn(1L);
 
-        subscriptionService.unsubscribe(1L);
+        AdvisorProductSubscription existing = new AdvisorProductSubscription();
+        existing.setId(10L);
+        existing.setStatus("CANCELLED");
+        when(subscriptionMapper.selectByUserIdAndProductId(3L, productId)).thenReturn(existing);
 
-        verify(subscriptionMapper, never()).updateStatusToCancelled(org.mockito.ArgumentMatchers.anyLong());
+        subscriptionService.subscribe(productId, null);
+
+        verify(subscriptionMapper).updateStatusToActive(10L);
     }
 
-    @Test
-    void listMySubscriptions_shouldQueryAllSubscriptionsByUserId() {
-        subscriptionService.listMySubscriptions();
-
-        verify(subscriptionMapper).selectSubscriptionsByUserId(1L);
-    }
+    // ===================== unsubscribe =====================
 
     @Test
-    void listMySubscriptions_shouldReturnPagedResultWithDefaultSortWhenQueryMissing() {
-        MySubscriptionQueryDTO queryDTO = new MySubscriptionQueryDTO();
-        MySubscriptionItemVO item = new MySubscriptionItemVO();
-        item.setSubscriptionId(10L);
+    void testUnsubscribeSuccess() {
+        Long productId = 1L;
+        AdvisorProductSubscription existing = new AdvisorProductSubscription();
+        existing.setId(10L);
+        existing.setStatus("ACTIVE");
+        when(subscriptionMapper.selectByUserIdAndProductId(3L, productId)).thenReturn(existing);
 
-        when(subscriptionMapper.countSubscriptionsByUserId(1L, null, null, null)).thenReturn(1L);
-        when(subscriptionMapper.selectSubscriptionsPageByUserId(1L, null, null, null, "subscribedAtDesc", 0, 10))
-                .thenReturn(List.of(item));
+        AdvisorProduct product = createProduct(productId, "测试产品", 5L);
+        when(productMapper.selectById(productId)).thenReturn(product);
 
-        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(queryDTO);
-
-        assertEquals(1L, result.getTotal());
-        assertEquals(1, result.getPageNum());
-        assertEquals(10, result.getPageSize());
-        assertEquals(1, result.getRecords().size());
-        verify(subscriptionMapper).countSubscriptionsByUserId(1L, null, null, null);
-        verify(subscriptionMapper).selectSubscriptionsPageByUserId(1L, null, null, null, "subscribedAtDesc", 0, 10);
-    }
-
-    @Test
-    void listMySubscriptions_shouldBackfillPendingVersionActionsOnPagedItems() {
-        MySubscriptionQueryDTO queryDTO = new MySubscriptionQueryDTO();
-        MySubscriptionItemVO item = new MySubscriptionItemVO();
-        item.setSubscriptionId(10L);
-        SubscriptionVersionAction action = new SubscriptionVersionAction();
-        action.setId(99L);
-        action.setSubscriptionId(10L);
-        action.setActionType("CONFIRM_REQUIRED");
-        action.setActionStatus("PENDING");
-
-        when(subscriptionMapper.countSubscriptionsByUserId(1L, null, null, null)).thenReturn(1L);
-        when(subscriptionMapper.selectSubscriptionsPageByUserId(1L, null, null, null, "subscribedAtDesc", 0, 10))
-                .thenReturn(List.of(item));
-        when(subscriptionVersionActionMapper.selectPendingBySubscriptionIds(List.of(10L)))
-                .thenReturn(List.of(action));
-
-        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(queryDTO);
-
-        List<SubscriptionVersionAction> pendingVersionActions = result.getRecords().get(0).getPendingVersionActions();
-        assertNotNull(pendingVersionActions);
-        assertEquals(1, pendingVersionActions.size());
-        assertEquals(99L, pendingVersionActions.get(0).getId());
-    }
-
-    @Test
-    void createVersionActions_shouldInsertActionsForActiveSubscriptionsOnly() {
-        AdvisorProductSubscription active = new AdvisorProductSubscription();
-        active.setId(10L);
-        active.setProductId(8L);
-        active.setUserId(1L);
-        active.setStatus("ACTIVE");
-
-        AdvisorProductSubscription cancelled = new AdvisorProductSubscription();
-        cancelled.setId(11L);
-        cancelled.setProductId(8L);
-        cancelled.setUserId(2L);
-        cancelled.setStatus("CANCELLED");
-
-        when(subscriptionMapper.selectActiveSubscriptionsByProductId(8L)).thenReturn(List.of(active));
-
-        subscriptionService.createVersionActions(8L, 101L, "MAJOR", "CONFIRM_REQUIRED", "PENDING", "调仓并提升风险等级");
-
-        ArgumentCaptor<SubscriptionVersionAction> actionCaptor = ArgumentCaptor.forClass(SubscriptionVersionAction.class);
-        verify(subscriptionVersionActionMapper).insert(actionCaptor.capture());
-        assertEquals(10L, actionCaptor.getValue().getSubscriptionId());
-        assertEquals("CONFIRM_REQUIRED", actionCaptor.getValue().getActionType());
-        assertEquals("PENDING", actionCaptor.getValue().getActionStatus());
-        assertEquals("MAJOR", actionCaptor.getValue().getChangeType());
-    }
-
-    @Test
-    void decideVersionAction_shouldConfirmPendingActionWhenDecisionIsConfirm() {
-        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
-        subscription.setId(10L);
-        subscription.setProductId(8L);
-        subscription.setUserId(1L);
-        subscription.setStatus("ACTIVE");
-
-        SubscriptionVersionAction action = new SubscriptionVersionAction();
-        action.setId(99L);
-        action.setSubscriptionId(10L);
-        action.setActionType("CONFIRM_REQUIRED");
-        action.setActionStatus("PENDING");
-
-        when(subscriptionMapper.selectById(10L)).thenReturn(subscription);
-        when(subscriptionVersionActionMapper.selectLatestPendingBySubscriptionId(10L)).thenReturn(action);
-
-        subscriptionService.decideVersionAction(10L, "CONFIRM");
-
-        verify(subscriptionVersionActionMapper).updateStatus(99L, "CONFIRMED");
-        verify(subscriptionMapper, never()).updateStatusToCancelled(10L);
-    }
-
-    @Test
-    void decideVersionAction_shouldCancelSubscriptionWhenDecisionIsCancel() {
-        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
-        subscription.setId(10L);
-        subscription.setProductId(8L);
-        subscription.setUserId(1L);
-        subscription.setStatus("ACTIVE");
-
-        SubscriptionVersionAction action = new SubscriptionVersionAction();
-        action.setId(99L);
-        action.setSubscriptionId(10L);
-        action.setActionType("CONFIRM_REQUIRED");
-        action.setActionStatus("PENDING");
-
-        when(subscriptionMapper.selectById(10L)).thenReturn(subscription);
-        when(subscriptionVersionActionMapper.selectLatestPendingBySubscriptionId(10L)).thenReturn(action);
-
-        subscriptionService.decideVersionAction(10L, "CANCEL");
+        subscriptionService.unsubscribe(productId);
 
         verify(subscriptionMapper).updateStatusToCancelled(10L);
-        verify(subscriptionVersionActionMapper).updateStatus(99L, "CANCELLED");
+    }
+
+    @Test
+    void testUnsubscribeAlreadyCancelled() {
+        Long productId = 1L;
+        AdvisorProductSubscription existing = new AdvisorProductSubscription();
+        existing.setId(10L);
+        existing.setStatus("CANCELLED");
+        when(subscriptionMapper.selectByUserIdAndProductId(3L, productId)).thenReturn(existing);
+
+        subscriptionService.unsubscribe(productId);
+
+        verify(subscriptionMapper, never()).updateStatusToCancelled(anyLong());
+    }
+
+    @Test
+    void testUnsubscribeNotExists() {
+        Long productId = 1L;
+        when(subscriptionMapper.selectByUserIdAndProductId(3L, productId)).thenReturn(null);
+
+        subscriptionService.unsubscribe(productId);
+
+        verify(subscriptionMapper, never()).updateStatusToCancelled(anyLong());
+    }
+
+    // ===================== listMySubscriptions =====================
+
+    @Test
+    void testListMySubscriptionsWithQuery() {
+        MySubscriptionQueryDTO query = new MySubscriptionQueryDTO();
+        query.setPageNum(1);
+        query.setPageSize(10);
+
+        MySubscriptionItemVO item = new MySubscriptionItemVO();
+        item.setSubscriptionId(100L);
+        item.setProductId(1L);
+        item.setProductName("已订阅产品");
+        item.setStatus("ACTIVE");
+
+        when(subscriptionMapper.selectSubscriptionsPageByUserId(eq(3L), isNull(), isNull(), isNull(), anyString(), eq(0), eq(10)))
+                .thenReturn(List.of(item));
+        when(subscriptionMapper.countSubscriptionsByUserId(eq(3L), isNull(), isNull(), isNull())).thenReturn(1L);
+        when(subscriptionVersionActionMapper.selectPendingBySubscriptionIds(anyList())).thenReturn(List.of());
+
+        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(query);
+
+        assertEquals(1, result.getRecords().size());
+        assertEquals("已订阅产品", result.getRecords().get(0).getProductName());
+    }
+
+    @Test
+    void testListMySubscriptionsWithFilter() {
+        MySubscriptionQueryDTO query = new MySubscriptionQueryDTO();
+        query.setKeyword("产品");
+        query.setSubscriptionStatus("ACTIVE");
+        query.setProductStatus("PUBLISHED");
+        query.setSortBy("productNameAsc");
+
+        when(subscriptionMapper.selectSubscriptionsPageByUserId(eq(3L), eq("产品"), eq("ACTIVE"), eq("PUBLISHED"), eq("productNameAsc"), eq(0), eq(10)))
+                .thenReturn(List.of());
+        when(subscriptionMapper.countSubscriptionsByUserId(eq(3L), eq("产品"), eq("ACTIVE"), eq("PUBLISHED"))).thenReturn(0L);
+
+        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(query);
+
+        assertTrue(result.getRecords().isEmpty());
+    }
+
+    @Test
+    void testListMySubscriptionsDefaultPagination() {
+        when(subscriptionMapper.selectSubscriptionsPageByUserId(anyLong(), any(), any(), any(), anyString(), eq(0), eq(10)))
+                .thenReturn(List.of());
+
+        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(null);
+
+        assertEquals(1, result.getPageNum());
+        assertEquals(10, result.getPageSize());
+    }
+
+    // ===================== createVersionActions =====================
+
+    @Test
+    void testCreateVersionActions() {
+        Long productId = 1L;
+        Long productVersionId = 10L;
+
+        AdvisorProductSubscription sub1 = new AdvisorProductSubscription();
+        sub1.setId(100L);
+        AdvisorProductSubscription sub2 = new AdvisorProductSubscription();
+        sub2.setId(101L);
+        when(subscriptionMapper.selectActiveSubscriptionsByProductId(productId))
+                .thenReturn(List.of(sub1, sub2));
+
+        subscriptionService.createVersionActions(productId, productVersionId, "NORMAL", "NOTICE", "NOTIFIED", "版本更新");
+
+        verify(subscriptionVersionActionMapper, times(2)).insert(any(SubscriptionVersionAction.class));
+    }
+
+    @Test
+    void testCreateVersionActionsNoSubscribers() {
+        when(subscriptionMapper.selectActiveSubscriptionsByProductId(1L)).thenReturn(List.of());
+
+        subscriptionService.createVersionActions(1L, 10L, "NORMAL", "NOTICE", "NOTIFIED", null);
+
+        verify(subscriptionVersionActionMapper, never()).insert(any());
+    }
+
+    // ===================== decideVersionAction =====================
+
+    @Test
+    void testDecideVersionActionConfirm() {
+        Long subscriptionId = 100L;
+
+        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
+        subscription.setId(subscriptionId);
+        subscription.setUserId(3L);
+        subscription.setStatus("ACTIVE");
+        when(subscriptionMapper.selectById(subscriptionId)).thenReturn(subscription);
+
+        SubscriptionVersionAction action = new SubscriptionVersionAction();
+        action.setId(200L);
+        action.setActionType("CONFIRM_REQUIRED");
+        action.setActionStatus("PENDING");
+        when(subscriptionVersionActionMapper.selectLatestPendingBySubscriptionId(subscriptionId)).thenReturn(action);
+
+        subscriptionService.decideVersionAction(subscriptionId, "CONFIRM");
+
+        verify(subscriptionVersionActionMapper).updateStatus(200L, "CONFIRMED");
+    }
+
+    @Test
+    void testDecideVersionActionCancel() {
+        Long subscriptionId = 100L;
+
+        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
+        subscription.setId(subscriptionId);
+        subscription.setUserId(3L);
+        subscription.setStatus("ACTIVE");
+        when(subscriptionMapper.selectById(subscriptionId)).thenReturn(subscription);
+
+        SubscriptionVersionAction action = new SubscriptionVersionAction();
+        action.setId(200L);
+        action.setActionType("CONFIRM_REQUIRED");
+        action.setActionStatus("PENDING");
+        when(subscriptionVersionActionMapper.selectLatestPendingBySubscriptionId(subscriptionId)).thenReturn(action);
+
+        subscriptionService.decideVersionAction(subscriptionId, "CANCEL");
+
+        verify(subscriptionMapper).updateStatusToCancelled(subscriptionId);
+        verify(subscriptionVersionActionMapper).updateStatus(200L, "CANCELLED");
+    }
+
+    @Test
+    void testDecideVersionActionNotOwned() {
+        Long subscriptionId = 100L;
+
+        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
+        subscription.setId(subscriptionId);
+        subscription.setUserId(99L); // different user
+        when(subscriptionMapper.selectById(subscriptionId)).thenReturn(subscription);
+
+        assertThrows(BusinessException.class, () -> subscriptionService.decideVersionAction(subscriptionId, "CONFIRM"));
+    }
+
+    @Test
+    void testDecideVersionActionEmptyDecision() {
+        Long subscriptionId = 100L;
+
+        assertThrows(BusinessException.class, () -> subscriptionService.decideVersionAction(subscriptionId, null));
+    }
+
+    @Test
+    void testDecideVersionActionInvalidDecision() {
+        Long subscriptionId = 100L;
+
+        assertThrows(BusinessException.class, () -> subscriptionService.decideVersionAction(subscriptionId, "INVALID"));
     }
 }

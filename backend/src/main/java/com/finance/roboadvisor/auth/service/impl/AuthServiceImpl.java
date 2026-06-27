@@ -21,6 +21,8 @@ import com.finance.roboadvisor.common.enums.RoleCodeEnum;
 import com.finance.roboadvisor.common.exception.BusinessException;
 import com.finance.roboadvisor.common.util.JwtUtil;
 import com.finance.roboadvisor.common.util.SecurityUtil;
+import com.finance.roboadvisor.product.mapper.ProductMapper;
+import com.finance.roboadvisor.subscription.mapper.SubscriptionMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -38,6 +40,8 @@ public class AuthServiceImpl implements AuthService {
     private final UserDetailsServiceImpl userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final ProductMapper productMapper;
+    private final SubscriptionMapper subscriptionMapper;
 
     @Value("${jwt.token-head}")
     private String tokenHead;
@@ -47,13 +51,17 @@ public class AuthServiceImpl implements AuthService {
                            UserRoleMapper userRoleMapper,
                            UserDetailsServiceImpl userDetailsService,
                            PasswordEncoder passwordEncoder,
-                           JwtUtil jwtUtil) {
+                           JwtUtil jwtUtil,
+                           ProductMapper productMapper,
+                           SubscriptionMapper subscriptionMapper) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.productMapper = productMapper;
+        this.subscriptionMapper = subscriptionMapper;
     }
 
     @Override
@@ -178,5 +186,58 @@ public class AuthServiceImpl implements AuthService {
             user.setEmail(dto.getEmail());
         }
         userMapper.updateProfile(user);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteAccount() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        List<String> roles = roleMapper.selectRolesByUserId(userId)
+                .stream().map(SysRole::getRoleCode).toList();
+
+        // 投顾有已上架产品不能注销
+        if (roles.contains("ADVISOR")) {
+            Long publishedCount = productMapper.countByCreator(userId, "PUBLISHED", null, null, null);
+            if (publishedCount != null && publishedCount > 0) {
+                throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "您有已上架产品，请先下架所有产品后再注销");
+            }
+        }
+        // 管理员不能注销
+        if (roles.contains("ADMIN")) {
+            throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "管理员账号无法自行注销");
+        }
+        // 取消所有订阅
+        subscriptionMapper.cancelByUserId(userId);
+        // 禁用账号
+        userMapper.updateStatus(userId, 0);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void setPin(String pin) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        SysUser user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_FOUND);
+        }
+        if (user.getSubPin() != null && !user.getSubPin().isEmpty()) {
+            throw new BusinessException(ResultCode.STATUS_NOT_ALLOWED, "交易密码已设置，不可修改");
+        }
+        if (pin == null || !pin.matches("\\d{6}")) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED, "交易密码必须为6位数字");
+        }
+        userMapper.updatePin(userId, passwordEncoder.encode(pin));
+    }
+
+    @Override
+    public void verifyPassword(String password) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        SysUser user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_FOUND);
+        }
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new BusinessException(ResultCode.VALIDATE_FAILED, "密码错误");
+        }
     }
 }

@@ -45,8 +45,8 @@ export interface SubscriptionVersionDecisionPayload {
   decision: SubscriptionVersionDecision
 }
 
-export function subscribeProduct(productId: number) {
-  return request.post<void>(`/public/advisor-products/${productId}/subscribe`)
+export function subscribeProduct(productId: number, amount?: number) {
+  return request.post<void>(`/public/advisor-products/${productId}/subscribe`, amount ? { amount } : {})
 }
 
 export function unsubscribeProduct(productId: number) {

@@ -11,6 +11,10 @@ import com.finance.roboadvisor.auth.mapper.UserMapper;
 import com.finance.roboadvisor.auth.mapper.UserRoleMapper;
 import com.finance.roboadvisor.common.api.ResultCode;
 import com.finance.roboadvisor.common.exception.BusinessException;
+import com.finance.roboadvisor.common.util.SecurityUtil;
+import com.finance.roboadvisor.product.mapper.ProductMapper;
+import com.finance.roboadvisor.product.mapper.ProductFlowLogMapper;
+import com.finance.roboadvisor.subscription.mapper.SubscriptionMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,39 +25,40 @@ import java.util.stream.Collectors;
 @Service
 public class AdminServiceImpl implements AdminService {
 
-    private final ProductMapper productMapper;
-    private final ProductFlowLogMapper productFlowLogMapper;
-    private final SubscriptionMapper subscriptionMapper;
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
+    private final ProductMapper productMapper;
+    private final ProductFlowLogMapper productFlowLogMapper;
+    private final SubscriptionMapper subscriptionMapper;
 
-    public AdminServiceImpl(ProductMapper productMapper,
-                            ProductFlowLogMapper productFlowLogMapper,
-                            SubscriptionMapper subscriptionMapper,
-                            UserMapper userMapper,
+    public AdminServiceImpl(UserMapper userMapper,
                             RoleMapper roleMapper,
-                            UserRoleMapper userRoleMapper) {
-        this.productMapper = productMapper;
-        this.productFlowLogMapper = productFlowLogMapper;
-        this.subscriptionMapper = subscriptionMapper;
+                            UserRoleMapper userRoleMapper,
+                            ProductMapper productMapper,
+                            ProductFlowLogMapper productFlowLogMapper,
+                            SubscriptionMapper subscriptionMapper) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
+        this.productMapper = productMapper;
+        this.productFlowLogMapper = productFlowLogMapper;
+        this.subscriptionMapper = subscriptionMapper;
     }
 
     @Override
     public AdminDashboardVO getDashboard() {
         AdminDashboardVO vo = new AdminDashboardVO();
-        // Basic counts
-        vo.setTotalSubscriptions(0L);
-        vo.setTotalAdvisors(0L);
-        vo.setTotalUsers(0L);
-        vo.setTotalProducts(0L);
-        vo.setPublishedProducts(0L);
-        vo.setPendingReviewProducts(0L);
-        vo.setTopSubscribedProducts(new ArrayList<>());
-        vo.setRecentChanges(new ArrayList<>());
+        vo.setTotalProducts(productMapper.countAll());
+        vo.setPublishedProducts(productMapper.countByStatus("PUBLISHED"));
+        vo.setPendingReviewProducts(productMapper.countByStatus("PENDING_REVIEW"));
+        vo.setTotalAdvisors(roleMapper.countUsersByRoleCode("ADVISOR"));
+        vo.setTotalUsers(roleMapper.countUsersByRoleCode("USER"));
+        vo.setTotalSubscriptions(subscriptionMapper.countAll());
+        List<AdminDashboardVO.RecentChangeVO> changes = productFlowLogMapper.selectRecent(10);
+        vo.setRecentChanges(changes != null ? changes : new ArrayList<>());
+        List<AdminDashboardVO.ProductSubscriptionVO> topSubscribed = subscriptionMapper.selectTopSubscribed(10);
+        vo.setTopSubscribedProducts(topSubscribed != null ? topSubscribed : new ArrayList<>());
         return vo;
     }
 
@@ -61,17 +66,12 @@ public class AdminServiceImpl implements AdminService {
     public AdminDashboardVO getAdvisorDashboard() {
         Long currentUserId = SecurityUtil.getCurrentUserId();
         AdminDashboardVO vo = new AdminDashboardVO();
-
-        // Count products by creator
-        long totalProducts = 0;
-        long publishedProducts = 0;
-        long pendingReviewProducts = 0;
-
-        vo.setTotalProducts(totalProducts);
-        vo.setPublishedProducts(publishedProducts);
-        vo.setPendingReviewProducts(pendingReviewProducts);
+        vo.setTotalProducts(productMapper.countByCreator(currentUserId, null, null, null, null));
+        vo.setPublishedProducts(productMapper.countByCreator(currentUserId, "PUBLISHED", null, null, null));
+        vo.setPendingReviewProducts(productMapper.countByCreator(currentUserId, "PENDING_REVIEW", null, null, null));
+        List<AdminDashboardVO.RecentChangeVO> changes = productFlowLogMapper.selectRecentByOperator(currentUserId, 10);
+        vo.setRecentChanges(changes != null ? changes : new ArrayList<>());
         vo.setTopSubscribedProducts(new ArrayList<>());
-        vo.setRecentChanges(new ArrayList<>());
         return vo;
     }
 
@@ -110,7 +110,6 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException(ResultCode.VALIDATE_FAILED, "角色不存在: " + roleCode);
         }
 
-        // Remove existing role assignments, then assign new role
         userRoleMapper.deleteByUserId(userId);
         SysUserRole userRole = new SysUserRole();
         userRole.setUserId(userId);

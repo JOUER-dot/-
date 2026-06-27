@@ -19,3 +19,15 @@ export function changePassword(payload: ChangePasswordPayload) {
 export function updateProfile(payload: UpdateProfilePayload) {
   return request.put<void>('/auth/profile', payload)
 }
+
+export function deleteAccount() {
+  return request.delete<void>('/auth/account')
+}
+
+export function setPin(pin: string) {
+  return request.post<void>('/auth/pin', { pin })
+}
+
+export function verifyPassword(password: string) {
+  return request.post<void>('/auth/verify-password', { password })
+}

@@ -4,11 +4,12 @@ import com.finance.roboadvisor.common.api.PageResult;
 import com.finance.roboadvisor.subscription.dto.MySubscriptionQueryDTO;
 import com.finance.roboadvisor.subscription.vo.MySubscriptionItemVO;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface SubscriptionService {
 
-    void subscribe(Long productId);
+    void subscribe(Long productId, BigDecimal amount);
 
     void unsubscribe(Long productId);
 

@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'node:path'
@@ -22,5 +23,18 @@ export default defineConfig({
   },
   server: {
     port: 8080
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    root: __dirname,
+    include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+    exclude: ['node_modules/**', 'dist/**', 'D:/MySQL/**', 'D:/University/**', 'C:/Program Files/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.spec.ts', 'src/env.d.ts', 'src/**/*.d.ts']
+    }
   }
 })

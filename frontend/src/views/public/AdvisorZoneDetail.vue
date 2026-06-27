@@ -8,6 +8,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import { getPublishedProductDetail, type PublicProductDetail } from '@/api/public-product'
 import { subscribeProduct } from '@/api/subscription'
+import { getMySubscriptions } from '@/api/subscription'
 import HoldingSnapshotCharts from '@/components/charts/HoldingSnapshotCharts.vue'
 import ProductNavChart from '@/components/charts/ProductNavChart.vue'
 import { useUserStore } from '@/stores/user'
@@ -27,6 +28,9 @@ const userStore = useUserStore()
 const loading = ref(false)
 const subscribing = ref(false)
 const subscribed = ref(false)
+const subDialogVisible = ref(false)
+const investAmount = ref(10000)
+const subPin = ref('')
 const fundDialogVisible = ref(false)
 const selectedFund = ref<PublicProductDetail['components'][0] | null>(null)
 
@@ -87,6 +91,13 @@ const loadDetail = async () => {
   try {
     const data = await getPublishedProductDetail(productId.value)
     Object.assign(detail, data)
+    // Check if user already subscribed
+    if (userStore.isLoggedIn) {
+      try {
+        const subData = await getMySubscriptions({ pageNum: 1, pageSize: 999 })
+        subscribed.value = subData.records.some(s => s.productId === productId.value && s.status === 'ACTIVE')
+      } catch { /* ignore */ }
+    }
   } finally {
     loading.value = false
   }
@@ -108,16 +119,22 @@ const handleSubscribe = async () => {
     await router.push({ path: '/login', query: { redirect: route.fullPath } })
     return
   }
-  try {
-    await ElMessageBox.confirm('确认订阅当前产品吗？', '确认订阅', { type: 'warning' })
-  } catch { return }
+  investAmount.value = 10000
+  subPin.value = ''
+  subDialogVisible.value = true
+}
 
-  subscribing.value = true
-  try {
-    await subscribeProduct(productId.value)
-    subscribed.value = true
-    ElMessage.success('订阅成功')
-  } finally { subscribing.value = false }
+const confirmSubscribe = async () => {
+  if (!investAmount.value || investAmount.value < 1000) {
+    ElMessage.warning('投入金额不能少于 1,000 元')
+    return
+  }
+  if (!/^\d{6}$/.test(subPin.value)) {
+    ElMessage.warning('请输入6位数字交易密码')
+    return
+  }
+  subDialogVisible.value = false
+  router.push(`/payment/${productId.value}?amount=${investAmount.value}`)
 }
 
 const handleFundClick = (fund: PublicProductDetail['components'][0]) => {
@@ -139,7 +156,7 @@ void loadDetail()
           </svg>
           返回
         </el-button>
-        <el-button type="primary" size="large" class="bar-subscribe" :loading="subscribing" @click="handleSubscribe">
+        <el-button type="primary" class="bar-subscribe" :loading="subscribing" @click="handleSubscribe">
           {{ subscribeButtonText }}
         </el-button>
       </div>
@@ -224,6 +241,29 @@ void loadDetail()
         <SectionCard title="收益曲线">
           <el-empty v-if="detail.navList.length === 0" description="暂无净值数据" />
           <ProductNavChart v-else :data="detail.navList" title="组合净值走势" />
+
+          <!-- 净值数据表格 -->
+          <div v-if="detail.navList.length > 0" class="nav-table-wrap">
+            <div class="nav-table-header">
+              <span>历史净值</span>
+              <el-button size="small" link @click="() => {}">展开全部</el-button>
+            </div>
+            <el-table :data="detail.navList.slice(-10)" border size="small" class="nav-table">
+              <el-table-column label="日期" min-width="120">
+                <template #default="{ row }">{{ row.navDate }}</template>
+              </el-table-column>
+              <el-table-column label="单位净值" min-width="140">
+                <template #default="{ row }">{{ formatDecimal(row.nav) }}</template>
+              </el-table-column>
+              <el-table-column label="累计收益" min-width="120">
+                <template #default="{ row }">
+                  <span :class="Number(row.cumReturn) >= 0 ? 'text-up' : 'text-down'">
+                    {{ formatPercent(row.cumReturn) }}
+                  </span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </SectionCard>
 
         <SectionCard title="持仓快照">
@@ -271,6 +311,25 @@ void loadDetail()
             <el-descriptions-item label="基金公司">{{ formatText(selectedFund.companyName) }}</el-descriptions-item>
             <el-descriptions-item label="配置权重">{{ formatPercent(selectedFund.weight) }}</el-descriptions-item>
           </el-descriptions>
+        </template>
+      </el-dialog>
+
+      <!-- 订阅金额对话框 -->
+      <el-dialog v-model="subDialogVisible" title="确认订阅" width="420px">
+        <div class="sub-dialog-body">
+          <p style="margin:0 0 16px;color:var(--color-text-2);font-size:14px;">请输入投入金额和交易密码</p>
+          <div style="margin-bottom:14px">
+            <label style="font-size:12px;font-weight:600;color:var(--color-text-2);display:block;margin-bottom:6px;">投入金额</label>
+            <el-input-number v-model="investAmount" :min="1000" :step="1000" :max="99999999" style="width:100%" size="large" />
+          </div>
+          <div style="margin-bottom:14px">
+            <label style="font-size:12px;font-weight:600;color:var(--color-text-2);display:block;margin-bottom:6px;">交易密码（6位数字）</label>
+            <el-input v-model="subPin" maxlength="6" placeholder="请输入6位数字交易密码" size="large" />
+          </div>
+        </div>
+        <template #footer>
+          <el-button @click="subDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmSubscribe">确认订阅</el-button>
         </template>
       </el-dialog>
     </div>
@@ -469,8 +528,8 @@ void loadDetail()
   line-height: 1.2;
 }
 
-.metric-value.up { color: var(--success-600); }
-.metric-value.down { color: var(--danger-600); }
+.metric-value.up { color: var(--danger-600); }
+.metric-value.down { color: var(--success-600); }
 
 .metric-unit {
   font-size: 12px;
