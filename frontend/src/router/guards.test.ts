@@ -79,6 +79,17 @@ describe('router guards', () => {
   })
 
   it('should redirect guest-only page to home when already logged in', async () => {
+    const userStore = await import('@/stores/user')
+    ;(userStore.useUserStore as any).mockReturnValue({
+      token: 'test-token',
+      userInfo: { id: 1, username: 'test', nickname: 'Test' },
+      roles: ['USER'],
+      isLoggedIn: true,
+      hasAnyRole: () => true,
+      restoreSession: mockRestoreSession,
+      logout: mockLogout
+    })
+
     setupRouterGuards(mockRouter)
     const guard = (mockRouter.beforeEach as any).mock.calls[0][0]
 

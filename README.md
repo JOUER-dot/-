@@ -19,16 +19,20 @@
 - Node.js 20+
 - MySQL 8.0+
 
-### 1. 启动数据库
+### 1. 初始化数据库
 
-```sql
-CREATE DATABASE IF NOT EXISTS finance DEFAULT CHARSET utf8mb4;
--- 导入建表语句: backend/src/main/resources/init.sql
+```bash
+# 执行建表脚本（会自动创建 finance 库并导入所有表和数据）
+mysql -u root -p < backend/src/main/resources/init.sql
 ```
 
-### 2. 修改数据库配置
+### 2. 修改数据库密码
 
-编辑 `backend/src/main/resources/application-dev.yml`，修改数据库连接信息。
+编辑 `backend/src/main/resources/application-dev.yml`，将数据库密码改为你自己的密码：
+
+```yaml
+password: ${DB_PASSWORD:你的密码}
+```
 
 ### 3. 启动后端
 
@@ -36,6 +40,8 @@ CREATE DATABASE IF NOT EXISTS finance DEFAULT CHARSET utf8mb4;
 cd backend
 mvn spring-boot:run
 ```
+
+等待控制台输出 `Started RoboAdvisorApplication` 即启动成功。
 
 后端默认运行在 `http://localhost:8081`
 
@@ -47,7 +53,7 @@ npm install
 npm run dev
 ```
 
-前端默认运行在 `http://localhost:5173`
+前端默认运行在 `http://localhost:8080`
 
 ### 5. 默认账号
 

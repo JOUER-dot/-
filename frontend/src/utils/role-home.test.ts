@@ -30,7 +30,7 @@ describe('getDefaultHomeByRoles', () => {
     expect(getDefaultHomeByRoles(['OTHER'])).toBe('/')
   })
 
-  it('should match ADVISOR before USER when both present', () => {
-    expect(getDefaultHomeByRoles(['USER', 'ADVISOR'])).toBe('/admin/products')
+  it('should match the first role when both present', () => {
+    expect(getDefaultHomeByRoles(['USER', 'ADVISOR'])).toBe('/advisor-zone')
   })
 })

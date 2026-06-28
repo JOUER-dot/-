@@ -15,12 +15,15 @@ import {
 } from '@/api/product'
 import type { FundOption } from '@/api/fund'
 
-// Mock request module
-const mockRequest = vi.fn() as any
-mockRequest.post = vi.fn()
-mockRequest.put = vi.fn()
-mockRequest.get = vi.fn()
-mockRequest.delete = vi.fn()
+// Mock request module - use vi.hoisted to avoid hoisting issue
+const mockRequest = vi.hoisted(() => {
+  const fn = vi.fn() as any
+  fn.post = vi.fn()
+  fn.put = vi.fn()
+  fn.get = vi.fn()
+  fn.delete = vi.fn()
+  return fn
+})
 
 vi.mock('@/utils/request', () => ({
   default: mockRequest

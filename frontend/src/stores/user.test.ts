@@ -152,7 +152,7 @@ describe('user store', () => {
     expect(store.hasAnyRole(['ADMIN'])).toBe(false)
   })
 
-  it('should handle corrupted persisted state gracefully', () => {
+  it('should handle corrupted persisted state gracefully', async () => {
     localStorage.setItem('finance_auth_state', 'not-valid-json')
 
     // The store's readPersistedState catches JSON parse errors

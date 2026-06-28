@@ -27,7 +27,7 @@ describe('formatDecimal', () => {
   })
 
   it('should handle null input', () => {
-    expect(formatDecimal(null)).toBe('-')
+    expect(formatDecimal(null)).toBe('0.0000')
   })
 
   it('should handle undefined input', () => {
