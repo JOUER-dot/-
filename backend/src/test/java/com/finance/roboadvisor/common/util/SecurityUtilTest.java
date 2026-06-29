@@ -65,6 +65,14 @@ public class SecurityUtilTest {
     }
 
     @Test
+    void testGetCurrentUserIdNotAuthenticatedFlag() {
+        // UsernamePasswordAuthenticationToken with 2-arg constructor is NOT authenticated
+        Authentication auth = new UsernamePasswordAuthenticationToken("test", "credentials");
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        assertThrows(BusinessException.class, SecurityUtil::getCurrentUserId);
+    }
+
+    @Test
     void testGetLoginUserSuccess() {
         LoginUser loginUser = new LoginUser(TEST_USER, List.of("ADVISOR"));
         Authentication auth = new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities());
@@ -73,5 +81,34 @@ public class SecurityUtilTest {
         LoginUser result = SecurityUtil.getLoginUser();
         assertEquals(TEST_USER_ID, result.getId());
         assertTrue(result.getRoles().contains("ADVISOR"));
+    }
+
+    @Test
+    void testGetLoginUserNotAuthenticated() {
+        SecurityContextHolder.getContext().setAuthentication(null);
+        assertThrows(BusinessException.class, SecurityUtil::getLoginUser);
+    }
+
+    @Test
+    void testGetLoginUserAnonymous() {
+        Authentication anonymous = new AnonymousAuthenticationToken(
+                "key", "anonymous", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))
+        );
+        SecurityContextHolder.getContext().setAuthentication(anonymous);
+        assertThrows(BusinessException.class, SecurityUtil::getLoginUser);
+    }
+
+    @Test
+    void testGetLoginUserWrongPrincipalType() {
+        Authentication auth = new UsernamePasswordAuthenticationToken("notALoginUser", null, List.of());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        assertThrows(BusinessException.class, SecurityUtil::getLoginUser);
+    }
+
+    @Test
+    void testGetLoginUserNotAuthenticatedFlag() {
+        Authentication auth = new UsernamePasswordAuthenticationToken("test", "credentials");
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        assertThrows(BusinessException.class, SecurityUtil::getLoginUser);
     }
 }

@@ -1,0 +1,14 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/MainFrame",
+    "pages/Auth/LoginPage",
+    "pages/Auth/RegisterPage",
+    "pages/Public/ProductDetailPage",
+    "pages/Public/ComparePage",
+    "pages/Advisor/ProductEditPage",
+    "pages/Reviewer/ReviewDetailPage",
+    "pages/User/TransactionPage",
+    "pages/Common/NotificationsPage"
+  ]
+}

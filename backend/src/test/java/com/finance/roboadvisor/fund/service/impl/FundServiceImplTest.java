@@ -110,4 +110,88 @@ public class FundServiceImplTest {
         // Verify the keyword is trimmed
         verify(fundMapper).selectEnabledFunds(eq("trimmed"), isNull(), eq(0), eq(10));
     }
+
+    @Test
+    void testSearchFundsPageNumLessThanOne() {
+        when(fundMapper.selectEnabledFunds(isNull(), isNull(), eq(0), eq(10))).thenReturn(List.of());
+        when(fundMapper.countEnabledFunds(isNull(), isNull())).thenReturn(0L);
+
+        PageResult<FundOptionVO> result = fundService.searchFunds(null, null, 0, 10);
+
+        assertEquals(1, result.getPageNum());
+        assertEquals(10, result.getPageSize());
+    }
+
+    @Test
+    void testSearchFundsPageSizeLessThanOne() {
+        when(fundMapper.selectEnabledFunds(isNull(), isNull(), eq(0), eq(10))).thenReturn(List.of());
+        when(fundMapper.countEnabledFunds(isNull(), isNull())).thenReturn(0L);
+
+        PageResult<FundOptionVO> result = fundService.searchFunds(null, null, 1, 0);
+
+        assertEquals(1, result.getPageNum());
+        assertEquals(10, result.getPageSize());
+    }
+
+    @Test
+    void testSearchFundsNegativePagination() {
+        when(fundMapper.selectEnabledFunds(isNull(), isNull(), eq(0), eq(10))).thenReturn(List.of());
+        when(fundMapper.countEnabledFunds(isNull(), isNull())).thenReturn(0L);
+
+        PageResult<FundOptionVO> result = fundService.searchFunds(null, null, -1, -5);
+
+        assertEquals(1, result.getPageNum());
+        assertEquals(10, result.getPageSize());
+    }
+
+    @Test
+    void testSearchFundsWithKeywordAndType() {
+        List<FundOptionVO> funds = List.of(
+                createFundOption(1L, "000001", "股票基金A", "EQUITY")
+        );
+        when(fundMapper.selectEnabledFunds(eq("股票"), eq("EQUITY"), eq(0), eq(10))).thenReturn(funds);
+        when(fundMapper.countEnabledFunds(eq("股票"), eq("EQUITY"))).thenReturn(1L);
+
+        PageResult<FundOptionVO> result = fundService.searchFunds("股票", "EQUITY", 1, 10);
+
+        assertEquals(1, result.getRecords().size());
+        assertEquals("股票基金A", result.getRecords().get(0).getFundName());
+    }
+
+    @Test
+    void testSearchFundsTrimFundType() {
+        when(fundMapper.selectEnabledFunds(isNull(), eq("EQUITY"), eq(0), eq(10))).thenReturn(List.of());
+        when(fundMapper.countEnabledFunds(isNull(), eq("EQUITY"))).thenReturn(0L);
+
+        fundService.searchFunds(null, "  EQUITY  ", 1, 10);
+
+        verify(fundMapper).selectEnabledFunds(isNull(), eq("EQUITY"), eq(0), eq(10));
+    }
+
+    @Test
+    void testSearchFundsBlankKeyword() {
+        when(fundMapper.selectEnabledFunds(isNull(), isNull(), eq(0), eq(10))).thenReturn(List.of());
+        when(fundMapper.countEnabledFunds(isNull(), isNull())).thenReturn(0L);
+
+        fundService.searchFunds("   ", null, 1, 10);
+
+        verify(fundMapper).selectEnabledFunds(isNull(), isNull(), eq(0), eq(10));
+    }
+
+    @Test
+    void testSearchFundsVerifyTotalAndOffset() {
+        List<FundOptionVO> funds = List.of(
+                createFundOption(1L, "000001", "基金A", "EQUITY"),
+                createFundOption(2L, "000002", "基金B", "BOND")
+        );
+        when(fundMapper.selectEnabledFunds(isNull(), isNull(), eq(10), eq(10))).thenReturn(funds);
+        when(fundMapper.countEnabledFunds(isNull(), isNull())).thenReturn(15L);
+
+        PageResult<FundOptionVO> result = fundService.searchFunds(null, null, 2, 10);
+
+        assertEquals(2, result.getRecords().size());
+        assertEquals(15L, result.getTotal());
+        assertEquals(2, result.getPageNum());
+        assertEquals(10, result.getPageSize());
+    }
 }

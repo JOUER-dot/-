@@ -1,9 +1,14 @@
 package com.finance.roboadvisor;
 
 import com.finance.roboadvisor.admin.service.impl.AdminServiceImplTest;
+import com.finance.roboadvisor.auth.security.JwtAuthenticationFilterTest;
+import com.finance.roboadvisor.auth.security.LoginUserTest;
+import com.finance.roboadvisor.auth.security.SecurityConfigTest;
 import com.finance.roboadvisor.auth.security.UserDetailsServiceImplTest;
 import com.finance.roboadvisor.auth.service.impl.AuthServiceImplTest;
 import com.finance.roboadvisor.common.api.ApiResultTest;
+import com.finance.roboadvisor.common.exception.BusinessExceptionTest;
+import com.finance.roboadvisor.common.exception.GlobalExceptionHandlerTest;
 import com.finance.roboadvisor.common.util.JwtUtilTest;
 import com.finance.roboadvisor.common.util.SecurityUtilTest;
 import com.finance.roboadvisor.fund.service.impl.FundServiceImplTest;
@@ -29,10 +34,15 @@ import org.junit.platform.suite.api.SuiteDisplayName;
         ApiResultTest.class,
         JwtUtilTest.class,
         SecurityUtilTest.class,
+        BusinessExceptionTest.class,
+        GlobalExceptionHandlerTest.class,
 
         // ===== 认证 =====
         AuthServiceImplTest.class,
         UserDetailsServiceImplTest.class,
+        JwtAuthenticationFilterTest.class,
+        LoginUserTest.class,
+        SecurityConfigTest.class,
 
         // ===== 业务 Service =====
         ProductServiceImplTest.class,

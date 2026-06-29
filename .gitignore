@@ -1,25 +1,57 @@
-# frontend
+# ========== Web Frontend (Vue) ==========
 frontend/node_modules/
 frontend/dist/
 
-# backend
+# ========== Backend (Java/Spring Boot) ==========
 backend/target/
+backend/*.jar
+backend/*.war
 
-# IDE
+# ========== HarmonyOS / DevEco ==========
+harmoneyFrontend/node_modules/
+harmoneyFrontend/oh_modules/
+harmoneyFrontend/local.properties
+harmoneyFrontend/.idea/
+harmoneyFrontend/build/
+harmoneyFrontend/**/build/
+harmoneyFrontend/.hvigor/
+harmoneyFrontend/.cxx/
+harmoneyFrontend/.clangd/
+harmoneyFrontend/.clang-format/
+harmoneyFrontend/.clang-tidy/
+harmoneyFrontend/.test/
+harmoneyFrontend/**/.test/
+harmoneyFrontend/.appanalyzer/
+harmoneyFrontend/.preview/
+harmoneyFrontend/**/.preview/
+
+# ========== IDE ==========
 .idea/
 .vscode/
+*.iml
+*.swp
+*.swo
 
-# env files with secrets
+# ========== Environment & Secrets ==========
 .env
 .env.local
 .env.*.local
+*.pem
+*.key
 
-# uploads
+# ========== Build Output ==========
+dist/
+build/
+out/
+
+# ========== Uploads ==========
 .uploads/
 
-# logs
+# ========== Logs ==========
 *.log
 
-# system
+# ========== OS / System ==========
 .DS_Store
 Thumbs.db
+Desktop.ini
+*.bak

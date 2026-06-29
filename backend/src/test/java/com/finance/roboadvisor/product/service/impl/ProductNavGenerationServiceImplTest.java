@@ -169,4 +169,119 @@ public class ProductNavGenerationServiceImplTest {
         assertThrows(BusinessException.class,
                 () -> navGenerationService.generatePublishedProductNav(productId));
     }
+
+    @Test
+    void testGenerateNavWithNullComponents() {
+        Long productId = 1L;
+        AdvisorProduct product = createPublishedProduct(productId, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = createVersion(10L, productId, 1);
+        when(productVersionMapper.selectByProductAndVersionNo(productId, 1)).thenReturn(version);
+
+        when(productComponentMapper.selectByVersionId(10L)).thenReturn(null);
+
+        assertThrows(BusinessException.class,
+                () -> navGenerationService.generatePublishedProductNav(productId));
+    }
+
+    @Test
+    void testGenerateNavWithMultipleFunds() {
+        Long productId = 1L;
+        AdvisorProduct product = createPublishedProduct(productId, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = createVersion(10L, productId, 1);
+        when(productVersionMapper.selectByProductAndVersionNo(productId, 1)).thenReturn(version);
+
+        DraftComponentVO comp1 = createComponent("000001", "基金A", new BigDecimal("0.6"));
+        DraftComponentVO comp2 = createComponent("000002", "基金B", new BigDecimal("0.4"));
+        when(productComponentMapper.selectByVersionId(10L)).thenReturn(List.of(comp1, comp2));
+
+        FundNav nav1a = createFundNav("000001", "基金A", LocalDate.of(2026, 6, 1), new BigDecimal("1.00000000"));
+        FundNav nav1b = createFundNav("000001", "基金A", LocalDate.of(2026, 6, 2), new BigDecimal("1.02000000"));
+        FundNav nav2a = createFundNav("000002", "基金B", LocalDate.of(2026, 6, 1), new BigDecimal("2.00000000"));
+        FundNav nav2b = createFundNav("000002", "基金B", LocalDate.of(2026, 6, 2), new BigDecimal("2.10000000"));
+        when(fundNavMapper.selectByFundCodes(anyList())).thenReturn(List.of(nav1a, nav1b, nav2a, nav2b));
+
+        navGenerationService.generatePublishedProductNav(productId);
+
+        verify(productNavMapper).deleteByProductId(productId);
+        verify(productNavMapper).batchInsert(argThat(list -> {
+            List<AdvisorProductNav> navList = (List<AdvisorProductNav>) list;
+            return navList.size() == 2;
+        }));
+    }
+
+    @Test
+    void testGenerateNavNoCommonDates() {
+        Long productId = 1L;
+        AdvisorProduct product = createPublishedProduct(productId, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = createVersion(10L, productId, 1);
+        when(productVersionMapper.selectByProductAndVersionNo(productId, 1)).thenReturn(version);
+
+        DraftComponentVO comp1 = createComponent("000001", "基金A", new BigDecimal("0.5"));
+        DraftComponentVO comp2 = createComponent("000002", "基金B", new BigDecimal("0.5"));
+        when(productComponentMapper.selectByVersionId(10L)).thenReturn(List.of(comp1, comp2));
+
+        // Fund A has dates 6/1, 6/2; Fund B has dates 6/3, 6/4 - no overlap
+        FundNav nav1a = createFundNav("000001", "基金A", LocalDate.of(2026, 6, 1), new BigDecimal("1.00000000"));
+        FundNav nav1b = createFundNav("000001", "基金A", LocalDate.of(2026, 6, 2), new BigDecimal("1.01000000"));
+        FundNav nav2a = createFundNav("000002", "基金B", LocalDate.of(2026, 6, 3), new BigDecimal("1.00000000"));
+        FundNav nav2b = createFundNav("000002", "基金B", LocalDate.of(2026, 6, 4), new BigDecimal("1.01000000"));
+        when(fundNavMapper.selectByFundCodes(anyList())).thenReturn(List.of(nav1a, nav1b, nav2a, nav2b));
+
+        assertThrows(BusinessException.class,
+                () -> navGenerationService.generatePublishedProductNav(productId));
+    }
+
+    @Test
+    void testGenerateNavFundMissingNavData() {
+        Long productId = 1L;
+        AdvisorProduct product = createPublishedProduct(productId, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = createVersion(10L, productId, 1);
+        when(productVersionMapper.selectByProductAndVersionNo(productId, 1)).thenReturn(version);
+
+        DraftComponentVO comp1 = createComponent("000001", "基金A", new BigDecimal("0.5"));
+        DraftComponentVO comp2 = createComponent("000002", "基金B", new BigDecimal("0.5"));
+        when(productComponentMapper.selectByVersionId(10L)).thenReturn(List.of(comp1, comp2));
+
+        // Only Fund A has NAV data, Fund B is missing
+        FundNav nav1 = createFundNav("000001", "基金A", LocalDate.of(2026, 6, 1), new BigDecimal("1.00000000"));
+        when(fundNavMapper.selectByFundCodes(anyList())).thenReturn(List.of(nav1));
+
+        assertThrows(BusinessException.class,
+                () -> navGenerationService.generatePublishedProductNav(productId));
+    }
+
+    @Test
+    void testGenerateNavPublishedVersionNoNull() {
+        Long productId = 1L;
+        AdvisorProduct product = createPublishedProduct(productId, null);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        assertThrows(BusinessException.class,
+                () -> navGenerationService.generatePublishedProductNav(productId));
+    }
+
+    @Test
+    void testGenerateNavFundNavListNull() {
+        Long productId = 1L;
+        AdvisorProduct product = createPublishedProduct(productId, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = createVersion(10L, productId, 1);
+        when(productVersionMapper.selectByProductAndVersionNo(productId, 1)).thenReturn(version);
+
+        DraftComponentVO comp = createComponent("000001", "测试基金", BigDecimal.ONE);
+        when(productComponentMapper.selectByVersionId(10L)).thenReturn(List.of(comp));
+        when(fundNavMapper.selectByFundCodes(anyList())).thenReturn(null);
+
+        assertThrows(BusinessException.class,
+                () -> navGenerationService.generatePublishedProductNav(productId));
+    }
 }

@@ -417,4 +417,221 @@ public class AuthServiceImplTest {
 
         assertThrows(BusinessException.class, () -> authService.verifyPassword("pass"));
     }
+
+    // ===================== Additional tests for coverage =====================
+
+    @Test
+    void testRegisterWithPhoneSuccess() {
+        RegisterDTO dto = new RegisterDTO();
+        dto.setUsername("newuser2");
+        dto.setPassword("password123");
+        dto.setConfirmPassword("password123");
+        dto.setNickname("NewUser2");
+        dto.setPhone("13900139000");
+
+        when(userMapper.countByUsername("newuser2")).thenReturn(0);
+        when(userMapper.countByPhone("13900139000")).thenReturn(0);
+        when(roleMapper.selectByRoleCode("USER")).thenReturn(USER_ROLE);
+        when(passwordEncoder.encode("password123")).thenReturn("encoded-password");
+
+        authService.register(dto);
+
+        verify(userMapper).insert(argThat(user ->
+                "13900139000".equals(user.getPhone())
+        ));
+    }
+
+    @Test
+    void testRegisterRoleStatusNull() {
+        RegisterDTO dto = new RegisterDTO();
+        dto.setUsername("newuser3");
+        dto.setPassword("password123");
+        dto.setConfirmPassword("password123");
+
+        when(userMapper.countByUsername("newuser3")).thenReturn(0);
+
+        SysRole role = new SysRole();
+        role.setId(10L);
+        role.setRoleCode("USER");
+        role.setStatus(null);
+        when(roleMapper.selectByRoleCode("USER")).thenReturn(role);
+
+        assertThrows(BusinessException.class, () -> authService.register(dto));
+    }
+
+    @Test
+    void testRegisterRoleStatusDisabled() {
+        RegisterDTO dto = new RegisterDTO();
+        dto.setUsername("newuser4");
+        dto.setPassword("password123");
+        dto.setConfirmPassword("password123");
+
+        when(userMapper.countByUsername("newuser4")).thenReturn(0);
+
+        SysRole role = new SysRole();
+        role.setId(10L);
+        role.setRoleCode("USER");
+        role.setStatus(0);
+        when(roleMapper.selectByRoleCode("USER")).thenReturn(role);
+
+        assertThrows(BusinessException.class, () -> authService.register(dto));
+    }
+
+    @Test
+    void testRegisterWithoutPhone() {
+        RegisterDTO dto = new RegisterDTO();
+        dto.setUsername("nophone");
+        dto.setPassword("password123");
+        dto.setConfirmPassword("password123");
+        dto.setNickname("NoPhone");
+
+        when(userMapper.countByUsername("nophone")).thenReturn(0);
+        when(roleMapper.selectByRoleCode("USER")).thenReturn(USER_ROLE);
+        when(passwordEncoder.encode("password123")).thenReturn("encoded-password");
+
+        authService.register(dto);
+
+        verify(userMapper).insert(argThat(user -> user.getPhone() == null));
+    }
+
+    @Test
+    void testChangePasswordUserNotFound() {
+        ChangePasswordDTO dto = new ChangePasswordDTO();
+        dto.setOldPassword("oldPass");
+        dto.setNewPassword("newPass123");
+        dto.setConfirmPassword("newPass123");
+
+        when(userMapper.selectById(1L)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> authService.changePassword(dto));
+    }
+
+    @Test
+    void testSetPinUserNotFound() {
+        when(userMapper.selectById(1L)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> authService.setPin("123456"));
+    }
+
+    @Test
+    void testSetPinNullPin() {
+        TEST_USER.setSubPin(null);
+        when(userMapper.selectById(1L)).thenReturn(TEST_USER);
+
+        assertThrows(BusinessException.class, () -> authService.setPin(null));
+    }
+
+    @Test
+    void testSetPinWrongLength() {
+        TEST_USER.setSubPin(null);
+        when(userMapper.selectById(1L)).thenReturn(TEST_USER);
+
+        assertThrows(BusinessException.class, () -> authService.setPin("12345"));
+    }
+
+    @Test
+    void testSetPinNonNumeric() {
+        TEST_USER.setSubPin(null);
+        when(userMapper.selectById(1L)).thenReturn(TEST_USER);
+
+        assertThrows(BusinessException.class, () -> authService.setPin("abcdef"));
+    }
+
+    @Test
+    void testDeleteAccountAdvisorWithoutPublishedProducts() {
+        SysRole role = new SysRole();
+        role.setRoleCode("ADVISOR");
+        when(roleMapper.selectRolesByUserId(1L)).thenReturn(List.of(role));
+        when(productMapper.countByCreator(1L, "PUBLISHED", null, null, null)).thenReturn(0L);
+
+        authService.deleteAccount();
+
+        verify(subscriptionMapper).cancelByUserId(1L);
+        verify(userMapper).updateStatus(1L, 0);
+    }
+
+    @Test
+    void testDeleteAccountAdvisorWithNullPublishedCount() {
+        SysRole role = new SysRole();
+        role.setRoleCode("ADVISOR");
+        when(roleMapper.selectRolesByUserId(1L)).thenReturn(List.of(role));
+        when(productMapper.countByCreator(1L, "PUBLISHED", null, null, null)).thenReturn(null);
+
+        authService.deleteAccount();
+
+        verify(subscriptionMapper).cancelByUserId(1L);
+        verify(userMapper).updateStatus(1L, 0);
+    }
+
+    @Test
+    void testUpdateProfileWithOnlyNickname() {
+        UpdateProfileDTO dto = new UpdateProfileDTO();
+        dto.setNickname("OnlyNick");
+
+        when(userMapper.selectById(1L)).thenReturn(TEST_USER);
+
+        authService.updateProfile(dto);
+
+        verify(userMapper).updateProfile(argThat(user ->
+                "OnlyNick".equals(user.getNickname())
+        ));
+    }
+
+    @Test
+    void testUpdateProfileWithOnlyPhone() {
+        UpdateProfileDTO dto = new UpdateProfileDTO();
+        dto.setPhone("13900139000");
+
+        when(userMapper.selectById(1L)).thenReturn(TEST_USER);
+
+        authService.updateProfile(dto);
+
+        verify(userMapper).updateProfile(argThat(user ->
+                "13900139000".equals(user.getPhone())
+        ));
+    }
+
+    @Test
+    void testUpdateProfileWithNullEmail() {
+        UpdateProfileDTO dto = new UpdateProfileDTO();
+        dto.setEmail(null);
+
+        when(userMapper.selectById(1L)).thenReturn(TEST_USER);
+
+        authService.updateProfile(dto);
+
+        verify(userMapper).updateProfile(any(SysUser.class));
+    }
+
+    @Test
+    void testUpdateProfileWithEmptyNickname() {
+        UpdateProfileDTO dto = new UpdateProfileDTO();
+        dto.setNickname("");
+
+        when(userMapper.selectById(1L)).thenReturn(TEST_USER);
+
+        authService.updateProfile(dto);
+
+        // Empty nickname should not be set (StringUtils.hasText returns false)
+        verify(userMapper).updateProfile(argThat(user ->
+                user.getNickname() == null || "TestUser".equals(user.getNickname())
+        ));
+    }
+
+    @Test
+    void testLoginUserStatusNull() {
+        LoginDTO dto = new LoginDTO();
+        dto.setUsername("nullstatus");
+        dto.setPassword("password123");
+
+        SysUser nullStatusUser = new SysUser();
+        nullStatusUser.setUsername("nullstatus");
+        nullStatusUser.setPasswordHash("encoded");
+        nullStatusUser.setStatus(null);
+
+        when(userMapper.selectByUsername("nullstatus")).thenReturn(nullStatusUser);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(dto));
+        assertEquals(40301, ex.getCode().intValue());
+    }
 }

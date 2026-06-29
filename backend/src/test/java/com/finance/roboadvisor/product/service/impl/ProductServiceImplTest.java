@@ -19,6 +19,7 @@ import com.finance.roboadvisor.product.entity.*;
 import com.finance.roboadvisor.product.mapper.*;
 import com.finance.roboadvisor.product.service.*;
 import com.finance.roboadvisor.product.vo.*;
+import com.finance.roboadvisor.subscription.entity.AdvisorProductSubscription;
 import com.finance.roboadvisor.subscription.mapper.SubscriptionMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -539,5 +540,375 @@ public class ProductServiceImplTest {
 
         List<AdvisorProductFlowLog> result = productService.listFlowLogs(productId);
         assertNotNull(result);
+    }
+
+    // ===================== Additional tests for coverage =====================
+
+    @Test
+    void testUpdateProductWhenPublished() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "PUBLISHED", 1L, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        FundOptionVO fund1 = new FundOptionVO();
+        fund1.setId(1L); fund1.setFundCode("001"); fund1.setFundName("A");
+        FundOptionVO fund2 = new FundOptionVO();
+        fund2.setId(2L); fund2.setFundCode("002"); fund2.setFundName("B");
+        when(fundMapper.selectEnabledFundsByIds(anyList())).thenReturn(List.of(fund1, fund2));
+
+        AdvisorProductDraft draft = new AdvisorProductDraft();
+        draft.setId(10L);
+        draft.setProductId(productId);
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(draft);
+
+        productService.updateProduct(productId, createSaveDTO());
+
+        verify(productMapper).updateBasicInfo(any(AdvisorProduct.class));
+    }
+
+    @Test
+    void testUpdateProductWhenRejected() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "REJECTED", 1L, 0);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        FundOptionVO fund1 = new FundOptionVO();
+        fund1.setId(1L); fund1.setFundCode("001"); fund1.setFundName("A");
+        FundOptionVO fund2 = new FundOptionVO();
+        fund2.setId(2L); fund2.setFundCode("002"); fund2.setFundName("B");
+        when(fundMapper.selectEnabledFundsByIds(anyList())).thenReturn(List.of(fund1, fund2));
+
+        AdvisorProductDraft draft = new AdvisorProductDraft();
+        draft.setId(10L);
+        draft.setProductId(productId);
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(draft);
+
+        productService.updateProduct(productId, createSaveDTO());
+
+        verify(productMapper).updateBasicInfo(any(AdvisorProduct.class));
+    }
+
+    @Test
+    void testUpdateProductDraftNotFound() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "DRAFT", 1L, 0);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        FundOptionVO fund1 = new FundOptionVO();
+        fund1.setId(1L); fund1.setFundCode("001"); fund1.setFundName("A");
+        FundOptionVO fund2 = new FundOptionVO();
+        fund2.setId(2L); fund2.setFundCode("002"); fund2.setFundName("B");
+        when(fundMapper.selectEnabledFundsByIds(anyList())).thenReturn(List.of(fund1, fund2));
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> productService.updateProduct(productId, createSaveDTO()));
+    }
+
+    @Test
+    void testUpdateProductOfflineStatus() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "OFFLINE", 1L, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        assertThrows(BusinessException.class, () -> productService.updateProduct(productId, createSaveDTO()));
+    }
+
+    @Test
+    void testSubmitProductPublishedWithInFlightVersion() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "PUBLISHED", 1L, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion inFlight = new AdvisorProductVersion();
+        inFlight.setId(5L);
+        when(productVersionMapper.selectLatestDraftOrSubmittedByProductId(productId)).thenReturn(inFlight);
+
+        assertThrows(BusinessException.class, () -> productService.submitProduct(productId, null));
+    }
+
+    @Test
+    void testSubmitProductWeightSumInvalid() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "DRAFT", 1L, 0);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductDraft draft = new AdvisorProductDraft();
+        draft.setId(10L);
+        draft.setBaseInfoJson("{\"description\":\"desc\"}");
+        draft.setParamsJson("{}");
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(draft);
+
+        DraftComponentVO dc1 = new DraftComponentVO();
+        dc1.setFundId(1L);
+        dc1.setWeight(new BigDecimal("0.6"));
+        DraftComponentVO dc2 = new DraftComponentVO();
+        dc2.setFundId(2L);
+        dc2.setWeight(new BigDecimal("0.6"));
+        when(productDraftComponentMapper.selectByDraftId(10L)).thenReturn(List.of(dc1, dc2));
+
+        assertThrows(BusinessException.class, () -> productService.submitProduct(productId, null));
+    }
+
+    @Test
+    void testSubmitProductDisabledFunds() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "DRAFT", 1L, 0);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductDraft draft = new AdvisorProductDraft();
+        draft.setId(10L);
+        draft.setBaseInfoJson("{\"description\":\"desc\"}");
+        draft.setParamsJson("{}");
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(draft);
+
+        DraftComponentVO dc1 = new DraftComponentVO();
+        dc1.setFundId(1L);
+        dc1.setWeight(new BigDecimal("1.0"));
+        when(productDraftComponentMapper.selectByDraftId(10L)).thenReturn(List.of(dc1));
+
+        // Return empty list - fund not found/disabled
+        when(fundMapper.selectEnabledFundsByIds(anyList())).thenReturn(List.of());
+
+        assertThrows(BusinessException.class, () -> productService.submitProduct(productId, null));
+    }
+
+    @Test
+    void testSubmitProductDraftNotFound() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "DRAFT", 1L, 0);
+        when(productMapper.selectById(productId)).thenReturn(product);
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> productService.submitProduct(productId, null));
+    }
+
+    @Test
+    void testSubmitProductWithMajorChangeType() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "PUBLISHED", 1L, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+        when(productVersionMapper.selectLatestDraftOrSubmittedByProductId(productId)).thenReturn(null);
+
+        AdvisorProductDraft draft = new AdvisorProductDraft();
+        draft.setId(10L);
+        draft.setBaseInfoJson("{\"description\":\"desc\"}");
+        draft.setParamsJson("{}");
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(draft);
+
+        DraftComponentVO dc1 = new DraftComponentVO();
+        dc1.setFundId(1L);
+        dc1.setWeight(new BigDecimal("1.0"));
+        when(productDraftComponentMapper.selectByDraftId(10L)).thenReturn(List.of(dc1));
+
+        FundOptionVO fund = new FundOptionVO();
+        fund.setId(1L);
+        fund.setFundCode("000001");
+        fund.setFundName("测试基金");
+        when(fundMapper.selectEnabledFundsByIds(anyList())).thenReturn(List.of(fund));
+
+        AdvisorProductVersion baseVersion = new AdvisorProductVersion();
+        baseVersion.setId(5L);
+        when(productVersionMapper.selectLatestPublishedByProductId(productId)).thenReturn(baseVersion);
+
+        SysRole reviewerRole = new SysRole();
+        reviewerRole.setId(100L);
+        reviewerRole.setRoleCode("REVIEWER");
+        when(roleMapper.selectByRoleCode("REVIEWER")).thenReturn(null);
+
+        ProductSubmitDTO submitDTO = new ProductSubmitDTO();
+        submitDTO.setChangeType("MAJOR");
+        submitDTO.setVersionNote("重大变更");
+
+        productService.submitProduct(productId, submitDTO);
+
+        verify(productVersionMapper).insert(argThat(v -> "MAJOR".equals(v.getChangeType())));
+    }
+
+    @Test
+    void testDeleteProductPublished() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "PUBLISHED", 1L, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        assertThrows(BusinessException.class, () -> productService.deleteProduct(productId));
+    }
+
+    @Test
+    void testDeleteProductWithActiveSubscriptions() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "OFFLINE", 1L, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductSubscription sub = new AdvisorProductSubscription();
+        sub.setId(1L);
+        sub.setStatus("ACTIVE");
+        when(subscriptionMapper.selectActiveSubscriptionsByProductId(productId))
+                .thenReturn(List.of(sub));
+
+        assertThrows(BusinessException.class, () -> productService.deleteProduct(productId));
+    }
+
+    @Test
+    void testDeleteProductWithDraftAndVersions() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "DRAFT", 1L, 0);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = new AdvisorProductVersion();
+        version.setId(10L);
+        when(productVersionMapper.selectByProductId(productId)).thenReturn(new ArrayList<>(List.of(version)));
+
+        AdvisorProductDraft draft = new AdvisorProductDraft();
+        draft.setId(5L);
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(draft);
+
+        productService.deleteProduct(productId);
+
+        verify(productDraftComponentMapper).deleteByDraftId(5L);
+        verify(productDraftMapper).deleteByProductId(productId);
+    }
+
+    @Test
+    void testCopyProductWithComponents() {
+        Long productId = 1L;
+        AdvisorProduct source = createProduct(productId, "源产品", "PUBLISHED", 1L, 2);
+        when(productMapper.selectById(productId)).thenReturn(source);
+
+        when(productMapper.insert(any(AdvisorProduct.class))).thenAnswer(inv -> {
+            AdvisorProduct p = inv.getArgument(0);
+            p.setId(200L);
+            return 1;
+        });
+
+        AdvisorProductDraft sourceDraft = new AdvisorProductDraft();
+        sourceDraft.setId(10L);
+        sourceDraft.setBaseInfoJson("{\"description\":\"desc\"}");
+        sourceDraft.setParamsJson("{}");
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(sourceDraft);
+        when(productDraftMapper.insert(any(AdvisorProductDraft.class))).thenAnswer(inv -> {
+            AdvisorProductDraft d = inv.getArgument(0);
+            d.setId(20L);
+            return 1;
+        });
+
+        DraftComponentVO comp = new DraftComponentVO();
+        comp.setFundId(1L);
+        comp.setWeight(new BigDecimal("1.0"));
+        when(productDraftComponentMapper.selectByDraftId(10L)).thenReturn(List.of(comp));
+
+        Long newId = productService.copyProduct(productId);
+
+        assertEquals(200L, newId);
+        verify(productDraftComponentMapper).batchInsert(anyList());
+    }
+
+    @Test
+    void testGetProductDetailDraftNotFound() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "DRAFT", 1L, 0);
+        when(productMapper.selectById(productId)).thenReturn(product);
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> productService.getProductDetail(productId));
+    }
+
+    @Test
+    void testGetProductDetailWithoutPublishedVersion() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "DRAFT", 1L, 0);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductDraft draft = new AdvisorProductDraft();
+        draft.setId(10L);
+        draft.setProductId(productId);
+        draft.setBaseInfoJson("{\"description\":\"desc\"}");
+        draft.setParamsJson("{}");
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(draft);
+
+        when(productDraftComponentMapper.selectByDraftId(10L)).thenReturn(List.of());
+        when(productReviewMapper.selectByProductId(productId)).thenReturn(List.of());
+
+        ProductDetailVO result = productService.getProductDetail(productId);
+
+        assertNotNull(result);
+        assertNull(result.getPublishedVersion());
+    }
+
+    @Test
+    void testGetProductDetailPublishedVersionNotFound() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "PUBLISHED", 1L, 2);
+        product.setPublishedVersionNo(2);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductDraft draft = new AdvisorProductDraft();
+        draft.setId(10L);
+        draft.setProductId(productId);
+        draft.setBaseInfoJson("{\"description\":\"desc\"}");
+        draft.setParamsJson("{}");
+        when(productDraftMapper.selectByProductId(productId)).thenReturn(draft);
+
+        when(productDraftComponentMapper.selectByDraftId(10L)).thenReturn(List.of());
+        when(productReviewMapper.selectByProductId(productId)).thenReturn(List.of());
+        when(productVersionMapper.selectByProductAndVersionNo(productId, 2)).thenReturn(null);
+
+        ProductDetailVO result = productService.getProductDetail(productId);
+
+        assertNotNull(result);
+        assertNull(result.getPublishedVersion());
+    }
+
+    @Test
+    void testCreateProductWithDisabledFunds() {
+        ProductSaveDTO dto = createSaveDTO();
+
+        // Only return one fund (the other is disabled)
+        FundOptionVO fund1 = new FundOptionVO();
+        fund1.setId(1L);
+        fund1.setFundCode("000001");
+        fund1.setFundName("基金A");
+        when(fundMapper.selectEnabledFundsByIds(anyList())).thenReturn(List.of(fund1));
+
+        assertThrows(BusinessException.class, () -> productService.createProduct(dto));
+    }
+
+    @Test
+    void testWithdrawProductNoSubmittedVersion() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "PENDING_REVIEW", 1L, 1);
+        when(productMapper.selectById(productId)).thenReturn(product);
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> productService.withdrawProduct(productId));
+    }
+
+    @Test
+    void testGenerateProductNavNotPublishedVersionNoNull() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "PUBLISHED", 1L, 1);
+        product.setPublishedVersionNo(null);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        assertThrows(BusinessException.class, () -> productService.generateProductNav(productId));
+    }
+
+    @Test
+    void testListProductsWithFilters() {
+        when(productMapper.selectByCreator(eq(1L), eq("DRAFT"), eq("STRATEGY"), eq("R3"), eq("keyword"), eq(0), eq(10)))
+                .thenReturn(List.of(createProduct(1L, "产品", "DRAFT", 1L, 0)));
+        when(productMapper.countByCreator(eq(1L), eq("DRAFT"), eq("STRATEGY"), eq("R3"), eq("keyword"))).thenReturn(1L);
+
+        PageResult<ProductListItemVO> result = productService.listProducts("DRAFT", "STRATEGY", "R3", "keyword", 1, 10);
+
+        assertEquals(1, result.getRecords().size());
+    }
+
+    @Test
+    void testGetProductDetailNotOwned() {
+        Long productId = 1L;
+        AdvisorProduct product = createProduct(productId, "产品", "DRAFT", 99L, 0);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        assertThrows(BusinessException.class, () -> productService.getProductDetail(productId));
     }
 }

@@ -323,4 +323,262 @@ public class SubscriptionServiceImplTest {
 
         assertThrows(BusinessException.class, () -> subscriptionService.decideVersionAction(subscriptionId, "INVALID"));
     }
+
+    // ===================== Additional tests for coverage =====================
+
+    @Test
+    void testListMySubscriptionsNoArg() {
+        MySubscriptionItemVO item = new MySubscriptionItemVO();
+        item.setSubscriptionId(100L);
+        item.setProductId(1L);
+        item.setProductName("已订阅产品");
+        item.setStatus("ACTIVE");
+
+        when(subscriptionMapper.selectSubscriptionsByUserId(3L)).thenReturn(List.of(item));
+        when(subscriptionVersionActionMapper.selectPendingBySubscriptionIds(anyList())).thenReturn(List.of());
+
+        List<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions();
+
+        assertEquals(1, result.size());
+        assertEquals("已订阅产品", result.get(0).getProductName());
+    }
+
+    @Test
+    void testListMySubscriptionsNoArgEmpty() {
+        when(subscriptionMapper.selectSubscriptionsByUserId(3L)).thenReturn(List.of());
+
+        List<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions();
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testSubscribeProductPublishedCountNull() {
+        Long productId = 1L;
+        when(publicProductMapper.countPublishedProductById(productId)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> subscriptionService.subscribe(productId, null));
+    }
+
+    @Test
+    void testSubscribeNewWithNullAmount() {
+        Long productId = 1L;
+        when(publicProductMapper.countPublishedProductById(productId)).thenReturn(1L);
+        when(subscriptionMapper.selectByUserIdAndProductId(3L, productId)).thenReturn(null);
+
+        subscriptionService.subscribe(productId, null);
+
+        verify(subscriptionMapper).insert(any(AdvisorProductSubscription.class));
+        verify(transactionService, never()).record(anyLong(), anyLong(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void testSubscribeResumeCancelledWithAmount() {
+        Long productId = 1L;
+        BigDecimal amount = new BigDecimal("5000");
+        when(publicProductMapper.countPublishedProductById(productId)).thenReturn(1L);
+
+        AdvisorProductSubscription existing = new AdvisorProductSubscription();
+        existing.setId(10L);
+        existing.setStatus("CANCELLED");
+        when(subscriptionMapper.selectByUserIdAndProductId(3L, productId)).thenReturn(existing);
+
+        AdvisorProduct product = createProduct(productId, "测试产品", 5L);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        subscriptionService.subscribe(productId, amount);
+
+        verify(subscriptionMapper).updateStatusToActive(10L);
+        verify(subscriptionMapper).updateInvestAmount(eq(10L), eq(amount), eq(amount));
+    }
+
+    @Test
+    void testDecideVersionActionNoPendingAction() {
+        Long subscriptionId = 100L;
+
+        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
+        subscription.setId(subscriptionId);
+        subscription.setUserId(3L);
+        subscription.setStatus("ACTIVE");
+        when(subscriptionMapper.selectById(subscriptionId)).thenReturn(subscription);
+
+        when(subscriptionVersionActionMapper.selectLatestPendingBySubscriptionId(subscriptionId)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> subscriptionService.decideVersionAction(subscriptionId, "CONFIRM"));
+    }
+
+    @Test
+    void testDecideVersionActionNotConfirmRequired() {
+        Long subscriptionId = 100L;
+
+        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
+        subscription.setId(subscriptionId);
+        subscription.setUserId(3L);
+        subscription.setStatus("ACTIVE");
+        when(subscriptionMapper.selectById(subscriptionId)).thenReturn(subscription);
+
+        SubscriptionVersionAction action = new SubscriptionVersionAction();
+        action.setId(200L);
+        action.setActionType("NOTICE");
+        action.setActionStatus("PENDING");
+        when(subscriptionVersionActionMapper.selectLatestPendingBySubscriptionId(subscriptionId)).thenReturn(action);
+
+        assertThrows(BusinessException.class, () -> subscriptionService.decideVersionAction(subscriptionId, "CONFIRM"));
+    }
+
+    @Test
+    void testListMySubscriptionsWithPendingActions() {
+        MySubscriptionQueryDTO query = new MySubscriptionQueryDTO();
+        query.setPageNum(1);
+        query.setPageSize(10);
+
+        MySubscriptionItemVO item = new MySubscriptionItemVO();
+        item.setSubscriptionId(100L);
+        item.setProductId(1L);
+        item.setProductName("产品A");
+        item.setStatus("ACTIVE");
+
+        when(subscriptionMapper.selectSubscriptionsPageByUserId(eq(3L), any(), any(), any(), anyString(), eq(0), eq(10)))
+                .thenReturn(List.of(item));
+        when(subscriptionMapper.countSubscriptionsByUserId(eq(3L), any(), any(), any())).thenReturn(1L);
+
+        SubscriptionVersionAction action = new SubscriptionVersionAction();
+        action.setId(1L);
+        action.setSubscriptionId(100L);
+        action.setActionType("CONFIRM_REQUIRED");
+        action.setActionStatus("PENDING");
+        when(subscriptionVersionActionMapper.selectPendingBySubscriptionIds(anyList()))
+                .thenReturn(List.of(action));
+
+        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(query);
+
+        assertEquals(1, result.getRecords().size());
+        assertFalse(result.getRecords().get(0).getPendingVersionActions().isEmpty());
+    }
+
+    @Test
+    void testListMySubscriptionsWithSortBy() {
+        MySubscriptionQueryDTO query = new MySubscriptionQueryDTO();
+        query.setSortBy("subscribedAtAsc");
+
+        when(subscriptionMapper.selectSubscriptionsPageByUserId(eq(3L), any(), any(), any(), eq("subscribedAtAsc"), eq(0), eq(10)))
+                .thenReturn(List.of());
+        when(subscriptionMapper.countSubscriptionsByUserId(eq(3L), any(), any(), any())).thenReturn(0L);
+
+        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(query);
+
+        assertTrue(result.getRecords().isEmpty());
+    }
+
+    @Test
+    void testListMySubscriptionsWithInvalidSortBy() {
+        MySubscriptionQueryDTO query = new MySubscriptionQueryDTO();
+        query.setSortBy("invalidSort");
+
+        when(subscriptionMapper.selectSubscriptionsPageByUserId(eq(3L), any(), any(), any(), eq("subscribedAtDesc"), eq(0), eq(10)))
+                .thenReturn(List.of());
+        when(subscriptionMapper.countSubscriptionsByUserId(eq(3L), any(), any(), any())).thenReturn(0L);
+
+        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(query);
+
+        assertTrue(result.getRecords().isEmpty());
+    }
+
+    @Test
+    void testListMySubscriptionsWithBlankKeyword() {
+        MySubscriptionQueryDTO query = new MySubscriptionQueryDTO();
+        query.setKeyword("   ");
+        query.setSubscriptionStatus("  ");
+        query.setProductStatus("");
+
+        when(subscriptionMapper.selectSubscriptionsPageByUserId(eq(3L), isNull(), isNull(), isNull(), anyString(), eq(0), eq(10)))
+                .thenReturn(List.of());
+        when(subscriptionMapper.countSubscriptionsByUserId(eq(3L), isNull(), isNull(), isNull())).thenReturn(0L);
+
+        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(query);
+
+        assertTrue(result.getRecords().isEmpty());
+    }
+
+    @Test
+    void testListMySubscriptionsWithCustomPagination() {
+        MySubscriptionQueryDTO query = new MySubscriptionQueryDTO();
+        query.setPageNum(3);
+        query.setPageSize(5);
+
+        when(subscriptionMapper.selectSubscriptionsPageByUserId(eq(3L), any(), any(), any(), anyString(), eq(10), eq(5)))
+                .thenReturn(List.of());
+        when(subscriptionMapper.countSubscriptionsByUserId(eq(3L), any(), any(), any())).thenReturn(0L);
+
+        PageResult<MySubscriptionItemVO> result = subscriptionService.listMySubscriptions(query);
+
+        assertEquals(3, result.getPageNum());
+        assertEquals(5, result.getPageSize());
+    }
+
+    @Test
+    void testCreateVersionActionsWithNullSubscriptions() {
+        when(subscriptionMapper.selectActiveSubscriptionsByProductId(1L)).thenReturn(null);
+
+        subscriptionService.createVersionActions(1L, 10L, "NORMAL", "NOTICE", "NOTIFIED", "note");
+
+        verify(subscriptionVersionActionMapper, never()).insert(any());
+    }
+
+    @Test
+    void testDecideVersionActionConfirmCaseInsensitive() {
+        Long subscriptionId = 100L;
+
+        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
+        subscription.setId(subscriptionId);
+        subscription.setUserId(3L);
+        subscription.setStatus("ACTIVE");
+        when(subscriptionMapper.selectById(subscriptionId)).thenReturn(subscription);
+
+        SubscriptionVersionAction action = new SubscriptionVersionAction();
+        action.setId(200L);
+        action.setActionType("CONFIRM_REQUIRED");
+        action.setActionStatus("PENDING");
+        when(subscriptionVersionActionMapper.selectLatestPendingBySubscriptionId(subscriptionId)).thenReturn(action);
+
+        subscriptionService.decideVersionAction(subscriptionId, "confirm");
+
+        verify(subscriptionVersionActionMapper).updateStatus(200L, "CONFIRMED");
+    }
+
+    @Test
+    void testDecideVersionActionCancelCaseInsensitive() {
+        Long subscriptionId = 100L;
+
+        AdvisorProductSubscription subscription = new AdvisorProductSubscription();
+        subscription.setId(subscriptionId);
+        subscription.setUserId(3L);
+        subscription.setStatus("ACTIVE");
+        when(subscriptionMapper.selectById(subscriptionId)).thenReturn(subscription);
+
+        SubscriptionVersionAction action = new SubscriptionVersionAction();
+        action.setId(200L);
+        action.setActionType("CONFIRM_REQUIRED");
+        action.setActionStatus("PENDING");
+        when(subscriptionVersionActionMapper.selectLatestPendingBySubscriptionId(subscriptionId)).thenReturn(action);
+
+        subscriptionService.decideVersionAction(subscriptionId, " cancel ");
+
+        verify(subscriptionMapper).updateStatusToCancelled(subscriptionId);
+        verify(subscriptionVersionActionMapper).updateStatus(200L, "CANCELLED");
+    }
+
+    @Test
+    void testSubscribeProductNotFoundForTransaction() {
+        Long productId = 1L;
+        BigDecimal amount = new BigDecimal("1000");
+
+        when(publicProductMapper.countPublishedProductById(productId)).thenReturn(1L);
+        when(subscriptionMapper.selectByUserIdAndProductId(3L, productId)).thenReturn(null);
+        when(productMapper.selectById(productId)).thenReturn(null);
+
+        subscriptionService.subscribe(productId, amount);
+
+        verify(transactionService).record(eq(3L), eq(productId), eq(String.valueOf(productId)), eq("SUBSCRIBE"), eq(amount));
+    }
 }

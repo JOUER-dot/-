@@ -163,4 +163,137 @@ public class StrategyRuleValidationServiceImplTest {
         assertThrows(BusinessException.class, () ->
                 validationService.validateOrThrow("SC_001", "STRATEGY", List.of(), null));
     }
+
+    @Test
+    void testValidateNullComponents() {
+        AdvisorStrategyRule rule = createRule(null, null, null, new BigDecimal("0.6"));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("SC_001", "STRATEGY")).thenReturn(rule);
+
+        assertDoesNotThrow(() ->
+                validationService.validateOrThrow("SC_001", "STRATEGY", null, null));
+    }
+
+    @Test
+    void testValidateEmptyComponentsWithNullMinAndMaxCount() {
+        AdvisorStrategyRule rule = createRule(null, null, new BigDecimal("0.05"), new BigDecimal("0.6"));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("SC_001", "STRATEGY")).thenReturn(rule);
+
+        assertDoesNotThrow(() ->
+                validationService.validateOrThrow("SC_001", "STRATEGY", List.of(), null));
+    }
+
+    @Test
+    void testValidateWithOverrideMaxFundCount() {
+        AdvisorStrategyRule rule = createRule(1, 5, new BigDecimal("0.05"), new BigDecimal("0.6"));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("SC_001", "STRATEGY")).thenReturn(rule);
+
+        StrategyRuleValidationService.StrategyRuleOverride override =
+                new StrategyRuleValidationService.StrategyRuleOverride();
+        override.setOverrideMaxFundCount(2);
+
+        List<DraftComponentVO> components = List.of(
+                createComponent(1L, "000001", "基金A", new BigDecimal("0.6")),
+                createComponent(2L, "000002", "基金B", new BigDecimal("0.4"))
+        );
+
+        assertDoesNotThrow(() ->
+                validationService.validateOrThrow("SC_001", "STRATEGY", components, override));
+    }
+
+    @Test
+    void testValidateWithOverrideMaxFundCountExceeded() {
+        AdvisorStrategyRule rule = createRule(1, 10, new BigDecimal("0.05"), new BigDecimal("0.6"));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("SC_001", "STRATEGY")).thenReturn(rule);
+
+        StrategyRuleValidationService.StrategyRuleOverride override =
+                new StrategyRuleValidationService.StrategyRuleOverride();
+        override.setOverrideMaxFundCount(2);
+
+        List<DraftComponentVO> components = List.of(
+                createComponent(1L, "000001", "基金A", new BigDecimal("0.4")),
+                createComponent(2L, "000002", "基金B", new BigDecimal("0.3")),
+                createComponent(3L, "000003", "基金C", new BigDecimal("0.3"))
+        );
+
+        assertThrows(BusinessException.class, () ->
+                validationService.validateOrThrow("SC_001", "STRATEGY", components, override));
+    }
+
+    @Test
+    void testValidateWithAllOverrides() {
+        AdvisorStrategyRule rule = createRule(3, 10, new BigDecimal("0.10"), new BigDecimal("0.5"));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("SC_001", "STRATEGY")).thenReturn(rule);
+
+        StrategyRuleValidationService.StrategyRuleOverride override =
+                new StrategyRuleValidationService.StrategyRuleOverride();
+        override.setOverrideMinFundCount(1);
+        override.setOverrideMaxFundCount(5);
+        override.setOverrideMaxSingleWeight(new BigDecimal("0.8"));
+
+        List<DraftComponentVO> components = List.of(
+                createComponent(1L, "000001", "基金A", new BigDecimal("0.8"))
+        );
+
+        assertDoesNotThrow(() ->
+                validationService.validateOrThrow("SC_001", "STRATEGY", components, override));
+    }
+
+    @Test
+    void testValidateRuleWithNullMinSingleWeight() {
+        AdvisorStrategyRule rule = createRule(1, 10, null, new BigDecimal("0.6"));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("SC_001", "STRATEGY")).thenReturn(rule);
+
+        List<DraftComponentVO> components = List.of(
+                createComponent(1L, "000001", "基金A", new BigDecimal("0.01"))
+        );
+
+        assertDoesNotThrow(() ->
+                validationService.validateOrThrow("SC_001", "STRATEGY", components, null));
+    }
+
+    @Test
+    void testValidateRuleWithNullMaxSingleWeight() {
+        AdvisorStrategyRule rule = createRule(1, 10, new BigDecimal("0.05"), null);
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("SC_001", "STRATEGY")).thenReturn(rule);
+
+        List<DraftComponentVO> components = List.of(
+                createComponent(1L, "000001", "基金A", new BigDecimal("0.99"))
+        );
+
+        assertDoesNotThrow(() ->
+                validationService.validateOrThrow("SC_001", "STRATEGY", components, null));
+    }
+
+    @Test
+    void testValidateWithOverrideMinFundCountExceeded() {
+        AdvisorStrategyRule rule = createRule(1, 10, new BigDecimal("0.05"), new BigDecimal("0.6"));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("SC_001", "STRATEGY")).thenReturn(rule);
+
+        StrategyRuleValidationService.StrategyRuleOverride override =
+                new StrategyRuleValidationService.StrategyRuleOverride();
+        override.setOverrideMinFundCount(3);
+
+        List<DraftComponentVO> components = List.of(
+                createComponent(1L, "000001", "基金A", new BigDecimal("0.6")),
+                createComponent(2L, "000002", "基金B", new BigDecimal("0.4"))
+        );
+
+        assertThrows(BusinessException.class, () ->
+                validationService.validateOrThrow("SC_001", "STRATEGY", components, override));
+    }
+
+    @Test
+    void testValidateMultipleComponentsAllValid() {
+        AdvisorStrategyRule rule = createRule(2, 5, new BigDecimal("0.10"), new BigDecimal("0.6"));
+        when(strategyRuleMapper.selectEnabledByStrategyAndType("SC_001", "STRATEGY")).thenReturn(rule);
+
+        List<DraftComponentVO> components = List.of(
+                createComponent(1L, "000001", "基金A", new BigDecimal("0.3")),
+                createComponent(2L, "000002", "基金B", new BigDecimal("0.3")),
+                createComponent(3L, "000003", "基金C", new BigDecimal("0.4"))
+        );
+
+        assertDoesNotThrow(() ->
+                validationService.validateOrThrow("SC_001", "STRATEGY", components, null));
+    }
 }

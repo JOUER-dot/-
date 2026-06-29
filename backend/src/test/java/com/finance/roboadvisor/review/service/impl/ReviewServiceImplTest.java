@@ -345,4 +345,180 @@ public class ReviewServiceImplTest {
 
         assertTrue(result.isEmpty());
     }
+
+    // ===================== Additional tests for coverage =====================
+
+    @Test
+    void testGetPendingProductDetailSuccess() {
+        Long productId = 1L;
+        ReviewDetailVO detail = new ReviewDetailVO();
+        detail.setId(productId);
+        detail.setName("待审产品详情");
+        detail.setVersionId(10L);
+        detail.setFeatureTagsText("稳健,成长");
+        detail.setBaseInfoJson("{\"name\":\"产品\"}");
+        detail.setParamsJson("{\"rate\":\"0.05\"}");
+
+        when(reviewMapper.selectPendingProductDetail(productId)).thenReturn(detail);
+
+        AdvisorProductVersion currentVersion = createSubmittedVersion(productId, 10L, 1, "NORMAL");
+        when(productVersionMapper.selectById(10L)).thenReturn(currentVersion);
+
+        when(productComponentMapper.selectByVersionId(10L)).thenReturn(List.of());
+        when(productReviewMapper.selectByProductId(productId)).thenReturn(List.of());
+
+        ReviewDetailVO result = reviewService.getPendingProductDetail(productId);
+
+        assertNotNull(result);
+        assertEquals("待审产品详情", result.getName());
+        assertEquals(2, result.getFeatureTags().size());
+        assertNotNull(result.getBaseInfo());
+        assertNotNull(result.getParams());
+    }
+
+    @Test
+    void testGetPendingProductDetailNotFound() {
+        when(reviewMapper.selectPendingProductDetail(999L)).thenReturn(null);
+
+        assertThrows(BusinessException.class,
+                () -> reviewService.getPendingProductDetail(999L));
+    }
+
+    @Test
+    void testGetPendingProductDetailWithBaseVersion() {
+        Long productId = 1L;
+        ReviewDetailVO detail = new ReviewDetailVO();
+        detail.setId(productId);
+        detail.setName("变更产品");
+        detail.setVersionId(20L);
+        detail.setFeatureTagsText(null);
+        detail.setBaseInfoJson("{}");
+        detail.setParamsJson("{}");
+
+        when(reviewMapper.selectPendingProductDetail(productId)).thenReturn(detail);
+
+        AdvisorProductVersion currentVersion = createSubmittedVersion(productId, 20L, 2, "MAJOR");
+        currentVersion.setBaseVersionId(15L);
+        when(productVersionMapper.selectById(20L)).thenReturn(currentVersion);
+
+        AdvisorProductVersion baseVersion = createSubmittedVersion(productId, 15L, 1, "NORMAL");
+        baseVersion.setVersionStatus("APPROVED");
+        when(productVersionMapper.selectById(15L)).thenReturn(baseVersion);
+
+        when(productComponentMapper.selectByVersionId(20L)).thenReturn(List.of());
+        when(productComponentMapper.selectByVersionId(15L)).thenReturn(List.of());
+        when(productReviewMapper.selectByProductId(productId)).thenReturn(List.of());
+
+        ReviewDetailVO result = reviewService.getPendingProductDetail(productId);
+
+        assertNotNull(result);
+        assertEquals("MAJOR", result.getChangeType());
+    }
+
+    @Test
+    void testApproveProductWithOverrideNoComment() {
+        Long productId = 1L;
+        AdvisorProduct product = createPendingProduct(productId, "产品", 1L);
+        when(productMapper.selectById(productId)).thenReturn(product);
+
+        AdvisorProductVersion version = createSubmittedVersion(productId, 10L, 1, "NORMAL");
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId)).thenReturn(version);
+
+        ReviewApproveDTO dto = new ReviewApproveDTO();
+        dto.setOverrideMaxSingleWeight(new BigDecimal("0.8"));
+        // No decision comment set
+
+        assertThrows(BusinessException.class, () -> reviewService.approveProduct(productId, dto));
+    }
+
+    @Test
+    void testRejectProductNoSubmittedVersion() {
+        Long productId = 1L;
+        AdvisorProduct product = createPendingProduct(productId, "产品", 1L);
+        when(productMapper.selectById(productId)).thenReturn(product);
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId)).thenReturn(null);
+
+        ReviewRejectDTO dto = new ReviewRejectDTO();
+        dto.setComment("原因");
+
+        assertThrows(BusinessException.class, () -> reviewService.rejectProduct(productId, dto));
+    }
+
+    @Test
+    void testBatchApproveWithFailure() {
+        Long productId = 1L;
+
+        when(productMapper.selectById(productId)).thenReturn(null);
+
+        ReviewApproveDTO dto = null;
+
+        assertThrows(BusinessException.class,
+                () -> reviewService.batchApprove(List.of(productId), dto));
+    }
+
+    @Test
+    void testBatchRejectWithFailure() {
+        Long productId = 1L;
+
+        AdvisorProduct product = createPendingProduct(productId, "产品", 1L);
+        when(productMapper.selectById(productId)).thenReturn(product);
+        when(productVersionMapper.selectLatestSubmittedByProductId(productId)).thenReturn(null);
+
+        ReviewRejectDTO dto = new ReviewRejectDTO();
+        dto.setComment("原因");
+
+        assertThrows(BusinessException.class,
+                () -> reviewService.batchReject(List.of(productId), dto));
+    }
+
+    @Test
+    void testListPendingProductsTrimKeyword() {
+        when(reviewMapper.selectPendingProducts(eq("keyword"), isNull(), isNull(), eq(0), eq(10)))
+                .thenReturn(List.of());
+        when(reviewMapper.countPendingProducts(eq("keyword"), isNull(), isNull())).thenReturn(0L);
+
+        PageResult<ReviewPendingListItemVO> result = reviewService.listPendingProducts("  keyword  ", "  ", "  ", 1, 10);
+
+        assertTrue(result.getRecords().isEmpty());
+    }
+
+    @Test
+    void testListPendingProductsWithFeatureTags() {
+        ReviewPendingListItemVO item = new ReviewPendingListItemVO();
+        item.setId(1L);
+        item.setName("产品A");
+        item.setFeatureTagsText("稳健,成长,高收益");
+
+        when(reviewMapper.selectPendingProducts(any(), any(), any(), anyInt(), anyInt())).thenReturn(List.of(item));
+        when(reviewMapper.countPendingProducts(any(), any(), any())).thenReturn(1L);
+
+        PageResult<ReviewPendingListItemVO> result = reviewService.listPendingProducts(null, null, null, 1, 10);
+
+        assertEquals(3, result.getRecords().get(0).getFeatureTags().size());
+    }
+
+    @Test
+    void testGetMyReviewHistoryWithInvalidPagination() {
+        when(reviewMapper.selectReviewHistoryByReviewer(eq(2L), eq(0), eq(10))).thenReturn(List.of());
+
+        List<ReviewHistoryItemVO> result = reviewService.getMyReviewHistory(0, 0);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testGetMyReviewHistoryWithNegativePagination() {
+        when(reviewMapper.selectReviewHistoryByReviewer(eq(2L), eq(0), eq(10))).thenReturn(List.of());
+
+        List<ReviewHistoryItemVO> result = reviewService.getMyReviewHistory(-1, -5);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testApproveProductProductNotFound() {
+        when(productMapper.selectById(999L)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> reviewService.approveProduct(999L, null));
+    }
 }

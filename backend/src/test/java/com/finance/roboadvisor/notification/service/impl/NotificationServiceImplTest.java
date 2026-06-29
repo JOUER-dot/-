@@ -122,4 +122,85 @@ public class NotificationServiceImplTest {
 
         verify(notificationMapper).markAllAsReadByUserId(2L);
     }
+
+    @Test
+    void testGetMyNotificationsWithInvalidPageNum() {
+        when(notificationMapper.selectByUserId(eq(2L), eq(0), eq(20))).thenReturn(List.of());
+
+        List<Notification> result = notificationService.getMyNotifications(0, 20);
+
+        assertTrue(result.isEmpty());
+        verify(notificationMapper).selectByUserId(eq(2L), eq(0), eq(20));
+    }
+
+    @Test
+    void testGetMyNotificationsWithNegativePageNum() {
+        when(notificationMapper.selectByUserId(eq(2L), eq(0), eq(20))).thenReturn(List.of());
+
+        List<Notification> result = notificationService.getMyNotifications(-1, 20);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testGetMyNotificationsWithInvalidPageSize() {
+        when(notificationMapper.selectByUserId(eq(2L), eq(0), eq(20))).thenReturn(List.of());
+
+        List<Notification> result = notificationService.getMyNotifications(1, 0);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testGetMyNotificationsWithNegativePageSize() {
+        when(notificationMapper.selectByUserId(eq(2L), eq(0), eq(20))).thenReturn(List.of());
+
+        List<Notification> result = notificationService.getMyNotifications(1, -5);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testGetMyNotificationsCustomPagination() {
+        Notification notif1 = new Notification();
+        notif1.setId(1L);
+        notif1.setTitle("通知1");
+        Notification notif2 = new Notification();
+        notif2.setId(2L);
+        notif2.setTitle("通知2");
+
+        when(notificationMapper.selectByUserId(eq(2L), eq(10), eq(5))).thenReturn(List.of(notif1, notif2));
+
+        List<Notification> result = notificationService.getMyNotifications(3, 5);
+
+        assertEquals(2, result.size());
+        assertEquals("通知1", result.get(0).getTitle());
+    }
+
+    @Test
+    void testCreateNotificationWithEmptyType() {
+        notificationService.createNotification(2L, "标题", "内容", "", null);
+
+        verify(notificationMapper).insert(argThat(n ->
+                n.getUserId() == 2L &&
+                "".equals(n.getType()) &&
+                n.getRelatedUrl() == null
+        ));
+    }
+
+    @Test
+    void testGetUnreadCountLargeNumber() {
+        when(notificationMapper.countUnreadByUserId(2L)).thenReturn(999999L);
+
+        long count = notificationService.getUnreadCount();
+
+        assertEquals(999999L, count);
+    }
+
+    @Test
+    void testMarkAsReadWithDifferentId() {
+        notificationService.markAsRead(200L);
+
+        verify(notificationMapper).markAsRead(200L);
+    }
 }
