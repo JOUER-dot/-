@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: roboadvisor-backend
+  profiles:
+    active: dev
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+  datasource:
+    hikari:
+      connection-test-query: SELECT 1
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.finance.roboadvisor.auth.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    jdbc-type-for-null: null
+
+jwt:
+  secret: ${JWT_SECRET:finance-roboadvisor-demo-secret-key-2026-auth-module}
+  expiration: 7200000
+  header: Authorization
+  token-head: "Bearer "

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.publicapi.mapper.PublicProductMapper">
+
+    <sql id="PublishedWhere">
+        from app.advisor_product p
+                 inner join app.sys_user u on u.id = p.creator_id
+                 left join (
+            select n1.product_id, n1.nav, n1.cum_return
+            from app.advisor_product_nav n1
+                     inner join (
+                select product_id, max(nav_date) as max_nav_date
+                from app.advisor_product_nav
+                group by product_id
+            ) latest on latest.product_id = n1.product_id and latest.max_nav_date = n1.nav_date
+        ) nav on nav.product_id = p.id
+        where p.status = 'PUBLISHED'
+          and p.published_version_no is not null
+        <if test="keyword != null and keyword != ''">
+            and (
+                p.name like concat('%', #{keyword}, '%')
+                or p.strategy_code like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="type != null and type != ''">
+            and p.type = #{type}
+        </if>
+        <if test="riskLevel != null and riskLevel != ''">
+            and p.risk_level = #{riskLevel}
+        </if>
+        <if test="creatorId != null">
+            and p.creator_id = #{creatorId}
+        </if>
+        <if test="fundCompany != null and fundCompany != ''">
+            and p.id in (
+                select distinct pc.product_id
+                from app.advisor_product_version v
+                         inner join app.advisor_product_component pc on pc.product_version_id = v.id
+                         inner join app.fund_info f on f.fund_code = pc.fund_code
+                where v.product_id = p.id
+                  and f.company_name like concat('%', #{fundCompany}, '%')
+            )
+        </if>
+    </sql>
+
+    <select id="selectPublishedProducts" resultType="com.finance.roboadvisor.publicapi.vo.PublicProductListItemVO">
+        select p.id as id,
+               p.name as name,
+               p.type as type,
+               p.risk_level as riskLevel,
+               p.strategy_code as strategyCode,
+               p.feature_tags as featureTagsText,
+               u.nickname as creatorName,
+               (select group_concat(distinct fi.company_name separator ',')
+                from app.advisor_product_version pv
+                         inner join app.advisor_product_component pc on pc.product_version_id = pv.id
+                         inner join app.fund_info fi on fi.fund_code = pc.fund_code
+                where pv.product_id = p.id
+                  and pv.version_no = p.published_version_no
+               ) as fundCompaniesText,
+               nav.nav as latestNav,
+               nav.cum_return as latestCumReturn
+        <include refid="PublishedWhere"/>
+        order by p.updated_at desc, p.id desc
+        limit #{pageSize} offset #{offset}
+    </select>
+
+    <select id="countPublishedProducts" resultType="long">
+        select count(1)
+        from app.advisor_product p
+        where p.status = 'PUBLISHED'
+          and p.published_version_no is not null
+        <if test="keyword != null and keyword != ''">
+            and (
+                p.name like concat('%', #{keyword}, '%')
+                or p.strategy_code like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="type != null and type != ''">
+            and p.type = #{type}
+        </if>
+        <if test="riskLevel != null and riskLevel != ''">
+            and p.risk_level = #{riskLevel}
+        </if>
+        <if test="creatorId != null">
+            and p.creator_id = #{creatorId}
+        </if>
+        <if test="fundCompany != null and fundCompany != ''">
+            and p.id in (
+                select distinct pc.product_id
+                from app.advisor_product_version v
+                         inner join app.advisor_product_component pc on pc.product_version_id = v.id
+                         inner join app.fund_info f on f.fund_code = pc.fund_code
+                where v.product_id = p.id
+                  and f.company_name like concat('%', #{fundCompany}, '%')
+            )
+        </if>
+    </select>
+
+    <select id="selectPublishedProductDetail" resultType="com.finance.roboadvisor.publicapi.vo.PublicProductDetailVO">
+        select p.id as id,
+               p.name as name,
+               p.type as type,
+               p.risk_level as riskLevel,
+               p.strategy_code as strategyCode,
+               p.feature_tags as featureTagsText,
+               v.id as versionId,
+               v.version_no as versionNo,
+               v.base_info_json as baseInfoJson,
+               v.params_json as paramsJson
+        from app.advisor_product p
+                 inner join app.advisor_product_version v
+                            on v.product_id = p.id
+                                and v.version_no = p.published_version_no
+        where p.id = #{productId}
+          and p.status = 'PUBLISHED'
+        limit 1
+    </select>
+
+    <select id="selectNavList" resultType="com.finance.roboadvisor.publicapi.vo.PublicProductNavPointVO">
+        select date_format(nav_date, '%Y-%m-%d') as navDate,
+               nav as nav,
+               cum_return as cumReturn
+        from app.advisor_product_nav
+        where product_id = #{productId}
+        order by nav_date asc
+    </select>
+
+    <select id="selectLatestHoldingSnapshot" resultType="com.finance.roboadvisor.publicapi.vo.PublicHoldingSnapshotVO">
+        select date_format(snapshot_date, '%Y-%m-%d') as snapshotDate,
+               holding_json as holdingJson
+        from app.advisor_product_holding_snapshot
+        where product_id = #{productId}
+        order by snapshot_date desc
+        limit 1
+    </select>
+
+    <select id="countPublishedProductById" resultType="long">
+        select count(1)
+        from app.advisor_product
+        where id = #{productId}
+          and status = 'PUBLISHED'
+          and published_version_no is not null
+    </select>
+
+    <select id="selectAdvisorsWithProducts" resultType="com.finance.roboadvisor.publicapi.vo.PublicAdvisorVO">
+        select distinct u.id as id,
+                        u.nickname as name
+        from app.advisor_product p
+                 inner join app.sys_user u on u.id = p.creator_id
+        where p.status = 'PUBLISHED'
+          and p.published_version_no is not null
+        order by u.nickname
+    </select>
+</mapper>

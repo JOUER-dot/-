@@ -1,6 +1,7 @@
 package com.finance.roboadvisor;
 
-import com.finance.roboadvisor.admin.service.impl.AdminServiceImplTest;
+import
+        com.finance.roboadvisor.admin.service.impl.AdminServiceImplTest;
 import com.finance.roboadvisor.auth.security.JwtAuthenticationFilterTest;
 import com.finance.roboadvisor.auth.security.LoginUserTest;
 import com.finance.roboadvisor.auth.security.SecurityConfigTest;

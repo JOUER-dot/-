@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.product.mapper.ProductNavMapper">
+
+    <delete id="deleteByProductId">
+        delete from app.advisor_product_nav
+        where product_id = #{productId}
+    </delete>
+
+    <insert id="batchInsert">
+        insert into app.advisor_product_nav (product_id, nav_date, nav, cum_return)
+        values
+        <foreach collection="items" item="item" separator=",">
+            (#{item.productId}, #{item.navDate}, #{item.nav}, #{item.cumReturn})
+        </foreach>
+    </insert>
+</mapper>

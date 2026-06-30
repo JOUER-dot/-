@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.subscription.mapper.SubscriptionMapper">
+
+    <resultMap id="SubscriptionResultMap" type="com.finance.roboadvisor.subscription.entity.AdvisorProductSubscription">
+        <id property="id" column="id"/>
+        <result property="productId" column="product_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectByUserIdAndProductId" resultMap="SubscriptionResultMap">
+        select id, product_id, user_id, status, created_at, updated_at
+        from app.advisor_product_subscription
+        where user_id = #{userId}
+          and product_id = #{productId}
+        limit 1
+    </select>
+
+    <select id="selectById" resultMap="SubscriptionResultMap">
+        select id, product_id, user_id, status, created_at, updated_at
+        from app.advisor_product_subscription
+        where id = #{id}
+        limit 1
+    </select>
+
+    <insert id="insert" parameterType="com.finance.roboadvisor.subscription.entity.AdvisorProductSubscription" useGeneratedKeys="true" keyProperty="id">
+        insert into app.advisor_product_subscription (product_id, user_id, status, invest_amount, current_value)
+        values (#{productId}, #{userId}, #{status}, #{investAmount}, #{currentValue})
+    </insert>
+
+    <update id="updateStatusToActive">
+        update app.advisor_product_subscription
+        set status = 'ACTIVE',
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="updateInvestAmount">
+        update app.advisor_product_subscription
+        set invest_amount = #{investAmount},
+            current_value = #{currentValue},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="updateStatusToCancelled">
+        update app.advisor_product_subscription
+        set status = 'CANCELLED',
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <select id="selectActiveSubscriptionsByProductId" resultMap="SubscriptionResultMap">
+        select id, product_id, user_id, status, created_at, updated_at
+        from app.advisor_product_subscription
+        where product_id = #{productId}
+          and status = 'ACTIVE'
+        order by id asc
+    </select>
+
+    <sql id="SubscriptionListColumns">
+        s.id as subscriptionId,
+        p.id as productId,
+        p.name as productName,
+        p.type as type,
+        p.risk_level as riskLevel,
+        p.status as productStatus,
+        s.status as status,
+        s.invest_amount as investAmount,
+        s.current_value as currentValue,
+        nav.nav as latestNav,
+        nav.cum_return as latestCumReturn,
+        s.created_at as subscribedAt
+    </sql>
+
+    <sql id="SubscriptionListFrom">
+        from app.advisor_product_subscription s
+                 inner join app.advisor_product p on p.id = s.product_id
+                 left join (
+            select n1.product_id, n1.nav, n1.cum_return
+            from app.advisor_product_nav n1
+                     inner join (
+                select product_id, max(nav_date) as max_nav_date
+                from app.advisor_product_nav
+                group by product_id
+            ) latest on latest.product_id = n1.product_id and latest.max_nav_date = n1.nav_date
+        ) nav on nav.product_id = p.id
+        where s.user_id = #{userId}
+        <if test="keyword != null and keyword != ''">
+            and p.name like concat('%', #{keyword}, '%')
+        </if>
+        <if test="subscriptionStatus != null and subscriptionStatus != ''">
+            and s.status = #{subscriptionStatus}
+        </if>
+        <if test="productStatus != null and productStatus != ''">
+            and p.status = #{productStatus}
+        </if>
+    </sql>
+
+    <select id="selectSubscriptionsByUserId" resultType="com.finance.roboadvisor.subscription.vo.MySubscriptionItemVO">
+        select <include refid="SubscriptionListColumns"/>
+        <include refid="SubscriptionListFrom"/>
+        order by s.created_at desc, s.id desc
+    </select>
+
+    <select id="selectSubscriptionsPageByUserId" resultType="com.finance.roboadvisor.subscription.vo.MySubscriptionItemVO">
+        select <include refid="SubscriptionListColumns"/>
+        <include refid="SubscriptionListFrom"/>
+        <choose>
+            <when test="sortBy == 'subscribedAtAsc'">
+                order by s.created_at asc, s.id asc
+            </when>
+            <when test="sortBy == 'productNameAsc'">
+                order by p.name asc, s.id desc
+            </when>
+            <when test="sortBy == 'productStatusFirst'">
+                order by
+                    case p.status
+                        when 'OFFLINE' then 0
+                        when 'REJECTED' then 1
+                        when 'PENDING_REVIEW' then 2
+                        when 'PUBLISHED' then 3
+                        else 4
+                    end asc,
+                    s.created_at desc,
+                    s.id desc
+            </when>
+            <otherwise>
+                order by s.created_at desc, s.id desc
+            </otherwise>
+        </choose>
+        limit #{pageSize} offset #{offset}
+    </select>
+
+    <select id="countSubscriptionsByUserId" resultType="long">
+        select count(1)
+        <include refid="SubscriptionListFrom"/>
+    </select>
+
+    <select id="countActiveByCreatorId" resultType="long">
+        select count(1)
+        from app.advisor_product_subscription s
+                 inner join app.advisor_product p on p.id = s.product_id
+        where p.creator_id = #{creatorId}
+          and s.status = 'ACTIVE'
+    </select>
+
+    <select id="countRecentWeekByCreatorId" resultType="long">
+        select count(1)
+        from app.advisor_product_subscription s
+                 inner join app.advisor_product p on p.id = s.product_id
+        where p.creator_id = #{creatorId}
+          and s.status = 'ACTIVE'
+          and s.created_at >= current_timestamp - interval '7 days'
+    </select>
+
+    <select id="countByProductId" resultType="long">
+        select count(1)
+        from app.advisor_product_subscription
+        where product_id = #{productId}
+          and status = 'ACTIVE'
+    </select>
+
+    <select id="countAll" resultType="long">
+        select count(1) from app.advisor_product_subscription
+    </select>
+
+    <select id="selectTopSubscribed" resultType="com.finance.roboadvisor.admin.vo.AdminDashboardVO$ProductSubscriptionVO">
+        select p.id as productId,
+               p.name as productName,
+               count(s.id) as subscriberCount
+        from app.advisor_product_subscription s
+                 inner join app.advisor_product p on p.id = s.product_id
+        where s.status = 'ACTIVE'
+        group by p.id, p.name
+        order by subscriberCount desc
+        limit #{limit}
+    </select>
+
+    <update id="cancelByUserId">
+        update app.advisor_product_subscription
+        set status = 'CANCELLED', updated_at = now()
+        where user_id = #{userId} and status = 'ACTIVE'
+    </update>
+</mapper>

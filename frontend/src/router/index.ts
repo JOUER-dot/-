@@ -20,6 +20,7 @@ import PaymentPage from '@/views/public/PaymentPage.vue'
 import MySubscriptions from '@/views/public/MySubscriptions.vue'
 import UserDashboard from '@/views/common/UserDashboard.vue'
 import Notifications from '@/views/common/Notifications.vue'
+import AiChat from '@/views/common/AiChat.vue'
 import TransactionHistory from '@/views/common/TransactionHistory.vue'
 import AdminDashboard from '@/views/admin/AdminDashboard.vue'
 import AdminUsers from '@/views/admin/AdminUsers.vue'
@@ -67,6 +68,16 @@ const router = createRouter({
             requiresAuth: true,
             title: '消息通知',
             description: '系统通知'
+          }
+        },
+        {
+          path: 'ai',
+          name: 'AiChat',
+          component: AiChat,
+          meta: {
+            requiresAuth: true,
+            title: 'AI 助手',
+            description: 'AI 智能投顾问答'
           }
         },
         {

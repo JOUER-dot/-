@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.notification.mapper.NotificationMapper">
+
+    <insert id="insert" parameterType="com.finance.roboadvisor.notification.entity.Notification" useGeneratedKeys="true" keyProperty="id">
+        insert into app.notification (user_id, title, content, type, is_read, related_url)
+        values (#{userId}, #{title}, #{content}, #{type}, #{read}, #{relatedUrl})
+    </insert>
+
+    <select id="selectByUserId" resultType="com.finance.roboadvisor.notification.entity.Notification">
+        select id, user_id as userId, title, content, type, is_read as `read`, related_url as relatedUrl, created_at as createdAt
+        from app.notification
+        where user_id = #{userId}
+        order by created_at desc, id desc
+        limit #{pageSize} offset #{offset}
+    </select>
+
+    <select id="countUnreadByUserId" resultType="long">
+        select count(1)
+        from app.notification
+        where user_id = #{userId} and is_read = 0
+    </select>
+
+    <update id="markAsRead">
+        update app.notification set is_read = 1 where id = #{id}
+    </update>
+
+    <update id="markAllAsReadByUserId">
+        update app.notification set is_read = 1 where user_id = #{userId} and is_read = 0
+    </update>
+</mapper>

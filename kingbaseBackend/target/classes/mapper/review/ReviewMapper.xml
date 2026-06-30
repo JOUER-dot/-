@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.review.mapper.ReviewMapper">
+
+    <sql id="PendingWhere">
+        from app.advisor_product p
+                 inner join app.sys_user u on u.id = p.creator_id
+                 inner join app.advisor_product_version v
+                            on v.product_id = p.id
+                                and v.version_no = p.current_version_no
+        where p.status = 'PENDING_REVIEW'
+          and v.version_status = 'SUBMITTED'
+        <if test="keyword != null and keyword != ''">
+            and (
+                p.name like concat('%', #{keyword}, '%')
+                or p.strategy_code like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="type != null and type != ''">
+            and p.type = #{type}
+        </if>
+        <if test="riskLevel != null and riskLevel != ''">
+            and p.risk_level = #{riskLevel}
+        </if>
+    </sql>
+
+    <select id="selectPendingProducts" resultType="com.finance.roboadvisor.review.vo.ReviewPendingListItemVO">
+        select p.id as id,
+               p.name as name,
+               p.type as type,
+               p.risk_level as riskLevel,
+               p.strategy_code as strategyCode,
+               p.feature_tags as featureTagsText,
+               p.status as status,
+               u.nickname as creatorName,
+               v.version_no as versionNo,
+               v.submitted_at as submittedAt
+        <include refid="PendingWhere"/>
+        order by v.submitted_at asc, p.id desc
+        limit #{pageSize} offset #{offset}
+    </select>
+
+    <select id="countPendingProducts" resultType="long">
+        select count(1)
+        <include refid="PendingWhere"/>
+    </select>
+
+    <select id="selectPendingProductDetail" resultType="com.finance.roboadvisor.review.vo.ReviewDetailVO">
+        select p.id as id,
+               p.name as name,
+               p.type as type,
+               p.risk_level as riskLevel,
+               p.strategy_code as strategyCode,
+               p.feature_tags as featureTagsText,
+               p.status as status,
+               u.nickname as creatorName,
+               v.id as versionId,
+               v.version_no as versionNo,
+               v.version_status as versionStatus,
+               v.submitted_at as submittedAt,
+               v.base_info_json as baseInfoJson,
+               v.params_json as paramsJson
+        from app.advisor_product p
+                 inner join app.sys_user u on u.id = p.creator_id
+                 inner join app.advisor_product_version v
+                            on v.product_id = p.id
+                                and v.version_no = p.current_version_no
+        where p.id = #{productId}
+          and p.status = 'PENDING_REVIEW'
+          and v.version_status = 'SUBMITTED'
+        limit 1
+    </select>
+
+    <select id="selectReviewHistoryByReviewer" resultType="com.finance.roboadvisor.review.vo.ReviewHistoryItemVO">
+        select r.id as id,
+               r.product_id as productId,
+               p.name as productName,
+               r.result as result,
+               r.comment as comment,
+               r.reviewed_at as reviewedAt
+        from app.advisor_product_review r
+                 inner join app.advisor_product p on p.id = r.product_id
+        where r.reviewer_id = #{reviewerId}
+        order by r.reviewed_at desc, r.id desc
+        limit #{pageSize} offset #{offset}
+    </select>
+</mapper>

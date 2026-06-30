@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.product.mapper.ProductHoldingSnapshotMapper">
+
+    <!-- KingbaseES: 使用 INSERT ... ON CONFLICT 实现 upsert (PostgreSQL 兼容语法) -->
+    <insert id="upsert" parameterType="com.finance.roboadvisor.product.entity.AdvisorProductHoldingSnapshot">
+        insert into app.advisor_product_holding_snapshot (product_id, snapshot_date, holding_json)
+        values (#{productId}, #{snapshotDate}, #{holdingJson})
+        on conflict (product_id, snapshot_date)
+        do update set holding_json = excluded.holding_json
+    </insert>
+</mapper>

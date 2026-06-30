@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.product.mapper.ProductVersionMapper">
+
+    <resultMap id="ProductVersionResultMap" type="com.finance.roboadvisor.product.entity.AdvisorProductVersion">
+        <id property="id" column="id"/>
+        <result property="productId" column="product_id"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="baseInfoJson" column="base_info_json"/>
+        <result property="paramsJson" column="params_json"/>
+        <result property="versionStatus" column="version_status"/>
+        <result property="changeType" column="change_type"/>
+        <result property="baseVersionId" column="base_version_id"/>
+        <result property="versionNote" column="version_note"/>
+        <result property="statusAtSubmit" column="status_at_submit"/>
+        <result property="submittedAt" column="submitted_at"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.finance.roboadvisor.product.entity.AdvisorProductVersion" useGeneratedKeys="true" keyProperty="id">
+        insert into app.advisor_product_version (
+            product_id, version_no, base_info_json, params_json, version_status,
+            change_type, base_version_id, version_note, status_at_submit, submitted_at
+        ) values (
+            #{productId}, #{versionNo}, #{baseInfoJson}, #{paramsJson}, #{versionStatus},
+            #{changeType}, #{baseVersionId}, #{versionNote}, #{statusAtSubmit}, #{submittedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="ProductVersionResultMap">
+        select id, product_id, version_no, base_info_json, params_json, version_status,
+               change_type, base_version_id, version_note, status_at_submit, submitted_at, created_at
+        from app.advisor_product_version
+        where id = #{id}
+    </select>
+
+    <select id="selectLatestSubmittedByProductId" resultMap="ProductVersionResultMap">
+        select id, product_id, version_no, base_info_json, params_json, version_status,
+               change_type, base_version_id, version_note, status_at_submit, submitted_at, created_at
+        from app.advisor_product_version
+        where product_id = #{productId}
+          and version_status = 'SUBMITTED'
+        order by version_no desc
+        limit 1
+    </select>
+
+    <select id="selectLatestPublishedByProductId" resultMap="ProductVersionResultMap">
+        select id, product_id, version_no, base_info_json, params_json, version_status,
+               change_type, base_version_id, version_note, status_at_submit, submitted_at, created_at
+        from app.advisor_product_version
+        where product_id = #{productId}
+          and version_status = 'APPROVED'
+        order by version_no desc
+        limit 1
+    </select>
+
+    <select id="selectLatestDraftOrSubmittedByProductId" resultMap="ProductVersionResultMap">
+        select id, product_id, version_no, base_info_json, params_json, version_status,
+               change_type, base_version_id, version_note, status_at_submit, submitted_at, created_at
+        from app.advisor_product_version
+        where product_id = #{productId}
+          and version_status in ('DRAFT', 'SUBMITTED')
+        order by version_no desc
+        limit 1
+    </select>
+
+    <select id="selectByProductAndVersionNo" resultMap="ProductVersionResultMap">
+        select id, product_id, version_no, base_info_json, params_json, version_status,
+               change_type, base_version_id, version_note, status_at_submit, submitted_at, created_at
+        from app.advisor_product_version
+        where product_id = #{productId}
+          and version_no = #{versionNo}
+        limit 1
+    </select>
+
+    <update id="updateVersionStatus">
+        update app.advisor_product_version
+        set version_status = #{versionStatus}
+        where id = #{id}
+    </update>
+
+    <select id="selectByProductId" resultMap="ProductVersionResultMap">
+        select id, product_id, version_no, base_info_json, params_json, version_status,
+               change_type, base_version_id, version_note, status_at_submit, submitted_at, created_at
+        from app.advisor_product_version
+        where product_id = #{productId}
+        order by version_no desc
+    </select>
+
+    <delete id="deleteByProductId">
+        delete from app.advisor_product_version where product_id = #{productId}
+    </delete>
+</mapper>

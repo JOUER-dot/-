@@ -35,6 +35,7 @@ const allMenus: MenuItem[] = [
   { label: '我的审核记录', path: '/review/my-history', group: '审核端', roles: ['REVIEWER'] },
   { label: '工作台', path: '/my/dashboard', group: '用户端', roles: ['USER'] },
   { label: '浏览产品', path: '/advisor-zone', group: '用户端', roles: ['USER'] },
+  { label: 'AI 助手', path: '/ai', group: '用户端', roles: ['USER'] },
   { label: '我的订阅', path: '/my-subscriptions', group: '用户端', roles: ['USER'] },
   { label: '管理后台', path: '/admin/dashboard', group: '系统管理', roles: ['ADMIN'] },
   { label: '用户管理', path: '/admin/users', group: '系统管理', roles: ['ADMIN'] },

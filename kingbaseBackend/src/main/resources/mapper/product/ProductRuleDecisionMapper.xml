@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.product.mapper.ProductRuleDecisionMapper">
+
+    <resultMap id="ProductRuleDecisionResultMap" type="com.finance.roboadvisor.product.entity.AdvisorProductRuleDecision">
+        <id property="id" column="id"/>
+        <result property="productId" column="product_id"/>
+        <result property="productVersionId" column="product_version_id"/>
+        <result property="baseRuleId" column="base_rule_id"/>
+        <result property="reviewerId" column="reviewer_id"/>
+        <result property="overrideMinFundCount" column="override_min_fund_count"/>
+        <result property="overrideMaxFundCount" column="override_max_fund_count"/>
+        <result property="overrideMaxSingleWeight" column="override_max_single_weight"/>
+        <result property="finalRuleJson" column="final_rule_json"/>
+        <result property="decisionComment" column="decision_comment"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        id, product_id, product_version_id, base_rule_id, reviewer_id,
+        override_min_fund_count, override_max_fund_count, override_max_single_weight,
+        final_rule_json, decision_comment, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.finance.roboadvisor.product.entity.AdvisorProductRuleDecision" useGeneratedKeys="true" keyProperty="id">
+        insert into app.advisor_product_rule_decision (
+            product_id, product_version_id, base_rule_id, reviewer_id,
+            override_min_fund_count, override_max_fund_count, override_max_single_weight,
+            final_rule_json, decision_comment
+        ) values (
+            #{productId}, #{productVersionId}, #{baseRuleId}, #{reviewerId},
+            #{overrideMinFundCount}, #{overrideMaxFundCount}, #{overrideMaxSingleWeight},
+            #{finalRuleJson}, #{decisionComment}
+        )
+    </insert>
+
+    <select id="selectByVersionId" resultMap="ProductRuleDecisionResultMap">
+        select <include refid="BaseColumns"/>
+        from app.advisor_product_rule_decision
+        where product_version_id = #{productVersionId}
+        order by id desc
+        limit 1
+    </select>
+</mapper>

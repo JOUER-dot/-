@@ -1,0 +1,16 @@
+server:
+  port: 8081
+
+spring:
+  datasource:
+    driver-class-name: com.kingbase8.Driver
+    url: jdbc:kingbase8://localhost:54321/finance
+    username: system
+    password: 123456
+    hikari:
+      schema: app
+      connection-init-sql: SET search_path TO app;
+
+logging:
+  level:
+    com.finance.roboadvisor: debug
