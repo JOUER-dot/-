@@ -11,6 +11,8 @@ import { subscribeProduct } from '@/api/subscription'
 import { getMySubscriptions } from '@/api/subscription'
 import HoldingSnapshotCharts from '@/components/charts/HoldingSnapshotCharts.vue'
 import ProductNavChart from '@/components/charts/ProductNavChart.vue'
+import AiAssistantPanel from '@/components/common/AiAssistantPanel.vue'
+import { getProductAiAnalysis, type ProductAnalysisResponse } from '@/api/ai'
 import { useUserStore } from '@/stores/user'
 import { formatDecimal, formatPercent, formatText } from '@/utils/format'
 import { productTypeLabel } from '@/utils/status'
@@ -33,6 +35,9 @@ const investAmount = ref(10000)
 const subPin = ref('')
 const fundDialogVisible = ref(false)
 const selectedFund = ref<PublicProductDetail['components'][0] | null>(null)
+const aiAssistantVisible = ref(false)
+const aiAnalysisLoading = ref(false)
+const aiAnalysis = ref<ProductAnalysisResponse | null>(null)
 
 const detail = reactive<PublicProductDetail>({
   id: 0,
@@ -142,6 +147,27 @@ const handleFundClick = (fund: PublicProductDetail['components'][0]) => {
   fundDialogVisible.value = true
 }
 
+const handleOpenAiAssistant = async () => {
+  if (!userStore.isLoggedIn) {
+    await router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+  aiAssistantVisible.value = true
+}
+
+const loadAiAnalysis = async () => {
+  if (!userStore.isLoggedIn) {
+    await router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+  aiAnalysisLoading.value = true
+  try {
+    aiAnalysis.value = await getProductAiAnalysis(productId.value)
+  } finally {
+    aiAnalysisLoading.value = false
+  }
+}
+
 void loadDetail()
 </script>
 
@@ -156,9 +182,12 @@ void loadDetail()
           </svg>
           返回
         </el-button>
-        <el-button type="primary" class="bar-subscribe" :loading="subscribing" @click="handleSubscribe">
-          {{ subscribeButtonText }}
-        </el-button>
+        <div class="bar-actions">
+          <el-button plain class="bar-ai" @click="handleOpenAiAssistant">AI 分析</el-button>
+          <el-button type="primary" class="bar-subscribe" :loading="subscribing" @click="handleSubscribe">
+            {{ subscribeButtonText }}
+          </el-button>
+        </div>
       </div>
 
       <!-- 产品主卡片 -->
@@ -236,6 +265,54 @@ void loadDetail()
           </div>
         </div>
       </div>
+
+      <SectionCard title="AI 产品分析报告">
+        <template #actions>
+          <el-button type="primary" plain :loading="aiAnalysisLoading" @click="loadAiAnalysis">
+            {{ aiAnalysis ? '重新生成' : '生成报告' }}
+          </el-button>
+        </template>
+        <div v-if="!aiAnalysis" class="ai-report-empty">
+          <div>
+            <div class="ai-report-empty__title">让小顾根据当前产品资料生成结构化报告</div>
+            <div class="ai-report-empty__desc">覆盖产品定位、适合人群、配置特点、主要风险和订阅前检查项。</div>
+          </div>
+          <el-button type="primary" :loading="aiAnalysisLoading" @click="loadAiAnalysis">立即分析</el-button>
+        </div>
+        <div v-else class="ai-report">
+          <div class="ai-report__hero">
+            <div>
+              <div class="ai-report__kicker">AI 判断</div>
+              <div class="ai-report__overview">{{ aiAnalysis.overview }}</div>
+            </div>
+            <div class="ai-report__badge">{{ aiAnalysis.riskBadge }}</div>
+          </div>
+          <div class="ai-report__grid">
+            <div class="ai-report-card">
+              <div class="ai-report-card__label">适合关注</div>
+              <div class="ai-report-card__text">{{ aiAnalysis.suitability }}</div>
+            </div>
+            <div class="ai-report-card">
+              <div class="ai-report-card__label">配置解读</div>
+              <div class="ai-report-card__text">{{ aiAnalysis.allocationSummary }}</div>
+            </div>
+          </div>
+          <div class="ai-report__columns">
+            <div class="ai-report-list ai-report-list--good">
+              <div class="ai-report-list__title">产品亮点</div>
+              <div v-for="item in aiAnalysis.highlights" :key="item" class="ai-report-list__item">{{ item }}</div>
+            </div>
+            <div class="ai-report-list ai-report-list--risk">
+              <div class="ai-report-list__title">风险关注</div>
+              <div v-for="item in aiAnalysis.risks" :key="item" class="ai-report-list__item">{{ item }}</div>
+            </div>
+            <div class="ai-report-list">
+              <div class="ai-report-list__title">订阅前检查</div>
+              <div v-for="item in aiAnalysis.checklist" :key="item" class="ai-report-list__item">{{ item }}</div>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
 
       <div class="detail-main">
         <SectionCard title="收益曲线">
@@ -332,6 +409,24 @@ void loadDetail()
           <el-button type="primary" @click="confirmSubscribe">确认订阅</el-button>
         </template>
       </el-dialog>
+
+      <button v-if="userStore.isLoggedIn" class="ai-float-button" type="button" @click="aiAssistantVisible = true">
+        AI
+      </button>
+      <div v-if="aiAssistantVisible" class="ai-float-panel">
+        <div class="ai-float-panel__bar">
+          <span>产品 AI 分析</span>
+          <button type="button" class="ai-float-panel__close" @click="aiAssistantVisible = false">×</button>
+        </div>
+        <AiAssistantPanel
+          compact
+          :show-header="false"
+          title="小顾产品助手"
+          subtitle="正在分析当前产品"
+          :product-id="productId"
+          :risk-level="detail.riskLevel"
+        />
+      </div>
     </div>
   </PageContainer>
 </template>
@@ -350,6 +445,11 @@ void loadDetail()
   justify-content: space-between;
   gap: 12px;
 }
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .bar-back {
   font-size: 13px;
   color: var(--color-text-3);
@@ -358,6 +458,7 @@ void loadDetail()
   gap: 4px;
 }
 .bar-back:hover { color: var(--color-text-1); }
+.bar-ai,
 .bar-subscribe {
   border-radius: 10px;
   font-weight: 700;
@@ -559,6 +660,180 @@ void loadDetail()
   margin-top: 4px;
 }
 
+.ai-report-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border: 1px dashed rgba(31, 92, 153, .36);
+}
+
+.ai-report-empty__title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text-1);
+}
+
+.ai-report-empty__desc {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--color-text-2);
+}
+
+.ai-report {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-report__hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #123b6d, #1f5c99);
+  color: #fff;
+}
+
+.ai-report__kicker {
+  font-size: 12px;
+  opacity: .72;
+}
+
+.ai-report__overview {
+  margin-top: 6px;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.ai-report__badge {
+  min-width: 82px;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  font-weight: 800;
+}
+
+.ai-report__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ai-report-card,
+.ai-report-list {
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.ai-report-card__label,
+.ai-report-list__title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-text-3);
+  margin-bottom: 8px;
+}
+
+.ai-report-card__text {
+  font-size: 14px;
+  color: var(--color-text-1);
+  line-height: 1.7;
+}
+
+.ai-report__columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ai-report-list__item {
+  position: relative;
+  padding-left: 14px;
+  font-size: 13px;
+  color: var(--color-text-2);
+  line-height: 1.7;
+}
+
+.ai-report-list__item::before {
+  position: absolute;
+  left: 0;
+  content: "•";
+  color: var(--color-primary);
+}
+
+.ai-report-list--good {
+  background: var(--success-50);
+}
+
+.ai-report-list--risk {
+  background: var(--warning-50);
+}
+
+.ai-float-button {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  width: 54px;
+  height: 54px;
+  border: none;
+  border-radius: 50%;
+  background: #123b6d;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 12px 28px rgba(18, 59, 109, .28);
+  cursor: pointer;
+  z-index: 20;
+}
+
+.ai-float-panel {
+  position: fixed;
+  right: 28px;
+  bottom: 92px;
+  width: min(430px, calc(100vw - 32px));
+  height: min(620px, calc(100vh - 128px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 18px 48px rgba(17, 31, 49, .2);
+  z-index: 30;
+}
+
+.ai-float-panel__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #0f2f57;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ai-float-panel__close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 @media (max-width: 860px) {
   .masthead-metrics {
     flex-direction: column;
@@ -568,5 +843,29 @@ void loadDetail()
   .metric-item { padding: 8px; }
   .masthead-content { padding: 20px 20px 0; }
   .masthead-metrics { margin: 0 20px 20px; }
+  .detail-bar {
+    align-items: flex-start;
+  }
+  .bar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .ai-float-panel {
+    right: 16px;
+    bottom: 84px;
+  }
+  .ai-float-button {
+    right: 16px;
+    bottom: 18px;
+  }
+  .ai-report-empty,
+  .ai-report__hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .ai-report__grid,
+  .ai-report__columns {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

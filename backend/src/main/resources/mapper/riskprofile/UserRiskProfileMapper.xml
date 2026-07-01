@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.finance.roboadvisor.riskprofile.mapper.UserRiskProfileMapper">
+
+    <resultMap id="RiskProfileResultMap" type="com.finance.roboadvisor.riskprofile.entity.UserRiskProfile">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="riskLevel" column="risk_level"/>
+        <result property="riskScore" column="risk_score"/>
+        <result property="capacityScore" column="capacity_score"/>
+        <result property="attitudeScore" column="attitude_score"/>
+        <result property="knowledgeScore" column="knowledge_score"/>
+        <result property="liquidityScore" column="liquidity_score"/>
+        <result property="investmentHorizonMonths" column="investment_horizon_months"/>
+        <result property="maxDrawdownTolerance" column="max_drawdown_tolerance"/>
+        <result property="experienceLevel" column="experience_level"/>
+        <result property="investmentGoal" column="investment_goal"/>
+        <result property="liquidityNeed" column="liquidity_need"/>
+        <result property="incomeRange" column="income_range"/>
+        <result property="assetRange" column="asset_range"/>
+        <result property="profileTags" column="profile_tags"/>
+        <result property="profileSummary" column="profile_summary"/>
+        <result property="source" column="source"/>
+        <result property="status" column="status"/>
+        <result property="assessedAt" column="assessed_at"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectProfileByUserId" resultMap="RiskProfileResultMap">
+        select id, user_id, risk_level, risk_score, capacity_score, attitude_score,
+               knowledge_score, liquidity_score, investment_horizon_months, max_drawdown_tolerance,
+               experience_level, investment_goal, liquidity_need, income_range, asset_range,
+               profile_tags, profile_summary, source, status, assessed_at, expires_at,
+               created_at, updated_at
+        from user_risk_profile
+        where user_id = #{userId}
+    </select>
+
+    <insert id="insertProfile" parameterType="com.finance.roboadvisor.riskprofile.entity.UserRiskProfile"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into user_risk_profile (
+            user_id, risk_level, risk_score, capacity_score, attitude_score,
+            knowledge_score, liquidity_score, investment_horizon_months, max_drawdown_tolerance,
+            experience_level, investment_goal, liquidity_need, income_range, asset_range,
+            profile_tags, profile_summary, source, status, assessed_at, expires_at
+        ) values (
+            #{userId}, #{riskLevel}, #{riskScore}, #{capacityScore}, #{attitudeScore},
+            #{knowledgeScore}, #{liquidityScore}, #{investmentHorizonMonths}, #{maxDrawdownTolerance},
+            #{experienceLevel}, #{investmentGoal}, #{liquidityNeed}, #{incomeRange}, #{assetRange},
+            #{profileTags}, #{profileSummary}, #{source}, #{status}, #{assessedAt}, #{expiresAt}
+        )
+    </insert>
+
+    <update id="updateProfile" parameterType="com.finance.roboadvisor.riskprofile.entity.UserRiskProfile">
+        update user_risk_profile
+        set risk_level = #{riskLevel},
+            risk_score = #{riskScore},
+            capacity_score = #{capacityScore},
+            attitude_score = #{attitudeScore},
+            knowledge_score = #{knowledgeScore},
+            liquidity_score = #{liquidityScore},
+            investment_horizon_months = #{investmentHorizonMonths},
+            max_drawdown_tolerance = #{maxDrawdownTolerance},
+            experience_level = #{experienceLevel},
+            investment_goal = #{investmentGoal},
+            liquidity_need = #{liquidityNeed},
+            income_range = #{incomeRange},
+            asset_range = #{assetRange},
+            profile_tags = #{profileTags},
+            profile_summary = #{profileSummary},
+            source = #{source},
+            status = #{status},
+            assessed_at = #{assessedAt},
+            expires_at = #{expiresAt},
+            updated_at = now()
+        where user_id = #{userId}
+    </update>
+
+    <insert id="insertAssessment" parameterType="com.finance.roboadvisor.riskprofile.entity.UserRiskAssessment"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into user_risk_assessment (
+            user_id, assessment_no, questionnaire_version, risk_level, risk_score,
+            capacity_score, attitude_score, knowledge_score, liquidity_score,
+            investment_horizon_months, max_drawdown_tolerance, result_summary,
+            raw_result_json, source
+        ) values (
+            #{userId}, #{assessmentNo}, #{questionnaireVersion}, #{riskLevel}, #{riskScore},
+            #{capacityScore}, #{attitudeScore}, #{knowledgeScore}, #{liquidityScore},
+            #{investmentHorizonMonths}, #{maxDrawdownTolerance}, #{resultSummary},
+            #{rawResultJson}, #{source}
+        )
+    </insert>
+
+    <insert id="insertAssessmentAnswer" parameterType="com.finance.roboadvisor.riskprofile.entity.UserRiskAssessmentAnswer"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into user_risk_assessment_answer (
+            assessment_id, question_code, question_title, option_code, option_text,
+            answer_value, score, dimension
+        ) values (
+            #{assessmentId}, #{questionCode}, #{questionTitle}, #{optionCode}, #{optionText},
+            #{answerValue}, #{score}, #{dimension}
+        )
+    </insert>
+</mapper>

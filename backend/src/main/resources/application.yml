@@ -23,5 +23,7 @@ jwt:
 ai:
   deepseek:
     api-key: ${DEEPSEEK_API_KEY:}
-    api-url: https://api.deepseek.com/v1/chat/completions
-    model: deepseek-chat
+    api-url: ${DEEPSEEK_API_URL:https://api.deepseek.com/chat/completions}
+    model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+    temperature: ${DEEPSEEK_TEMPERATURE:0.2}
+    max-tokens: ${DEEPSEEK_MAX_TOKENS:800}

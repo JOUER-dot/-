@@ -50,7 +50,6 @@ service.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiResponse<unknown>>) => {
     const status = error.response?.status
-    const message = error.response?.data?.message || error.message || '请求失败'
     if (status === 401) {
       ElMessage.error('登录已失效，请重新登录')
       clearAuth()
@@ -62,7 +61,7 @@ service.interceptors.response.use(
       void router.push('/403')
       return Promise.reject(error)
     }
-    ElMessage.error(message)
+    // 不在这里弹出错误，让具体业务层统一处理
     return Promise.reject(error)
   }
 )

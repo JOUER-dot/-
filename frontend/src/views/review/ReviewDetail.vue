@@ -15,6 +15,7 @@ import {
   type ReviewApprovePayload,
   type ReviewDetail
 } from '@/api/review'
+import { getReviewAiAdvice, type ReviewAdviceResponse } from '@/api/ai'
 import type { ProductComponentItem } from '@/api/product'
 import type { ReviewComponentDiffDisplayItem } from './review-detail-diff'
 import { formatPercent, formatText, formatDecimal } from '@/utils/format'
@@ -35,6 +36,8 @@ const rejecting = ref(false)
 const rejectDialogVisible = ref(false)
 const fundDialogVisible = ref(false)
 const selectedFund = ref<ProductComponentItem | ReviewComponentDiffDisplayItem | null>(null)
+const aiAdviceLoading = ref(false)
+const aiAdvice = ref<ReviewAdviceResponse | null>(null)
 
 const rejectForm = reactive({
   comment: ''
@@ -210,6 +213,21 @@ const loadDetail = async () => {
   }
 }
 
+const loadAiAdvice = async () => {
+  aiAdviceLoading.value = true
+  try {
+    aiAdvice.value = await getReviewAiAdvice(productId.value)
+  } finally {
+    aiAdviceLoading.value = false
+  }
+}
+
+const reviewRiskClass = (riskLevel: string) => {
+  if (riskLevel.includes('高')) return 'is-high'
+  if (riskLevel.includes('低')) return 'is-low'
+  return 'is-medium'
+}
+
 const buildApprovePayload = (): ReviewApprovePayload => {
   const payload: ReviewApprovePayload = {}
   if (overrideForm.overrideMinFundCount !== undefined) payload.overrideMinFundCount = overrideForm.overrideMinFundCount
@@ -269,6 +287,7 @@ void loadDetail()
     <PageHeader title="审核详情">
       <template #actions>
         <el-button @click="router.push('/review/pending')">返回待审列表</el-button>
+        <el-button plain :loading="aiAdviceLoading" @click="loadAiAdvice">AI 审核建议</el-button>
         <el-button type="success" :loading="approving" @click="handleApprove">审核通过</el-button>
         <el-button type="danger" :loading="rejecting" @click="rejectDialogVisible = true">审核驳回</el-button>
       </template>
@@ -321,6 +340,45 @@ void loadDetail()
           <div class="check-card__title">{{ item.label }}</div>
           <div class="check-card__result">{{ item.ok ? '✓' : '需关注' }}</div>
           <div class="check-card__detail">{{ item.detail }}</div>
+        </div>
+      </div>
+    </SectionCard>
+
+    <SectionCard title="AI 审核建议">
+      <template #actions>
+        <el-button type="primary" plain :loading="aiAdviceLoading" @click="loadAiAdvice">
+          {{ aiAdvice ? '重新生成' : '生成建议' }}
+        </el-button>
+      </template>
+      <div v-if="!aiAdvice" class="ai-review-empty">
+        <div>
+          <div class="ai-review-empty__title">让 AI 先做一轮审核预读</div>
+          <div class="ai-review-empty__desc">结合产品资料、基金成分、规则校验和版本变更，生成可复核的审核关注点。</div>
+        </div>
+        <el-button type="primary" :loading="aiAdviceLoading" @click="loadAiAdvice">开始分析</el-button>
+      </div>
+      <div v-else class="ai-review">
+        <div class="ai-review__hero">
+          <div>
+            <div class="ai-review__kicker">建议结论</div>
+            <div class="ai-review__decision">{{ aiAdvice.decisionHint }}</div>
+            <div class="ai-review__summary">{{ aiAdvice.summary }}</div>
+          </div>
+          <div class="ai-review__risk" :class="reviewRiskClass(aiAdvice.riskLevel)">{{ aiAdvice.riskLevel }}</div>
+        </div>
+        <div class="ai-review__columns">
+          <div class="ai-review-list ai-review-list--concern">
+            <div class="ai-review-list__title">重点关注</div>
+            <div v-for="item in aiAdvice.concerns" :key="item" class="ai-review-list__item">{{ item }}</div>
+          </div>
+          <div class="ai-review-list">
+            <div class="ai-review-list__title">判断依据</div>
+            <div v-for="item in aiAdvice.evidence" :key="item" class="ai-review-list__item">{{ item }}</div>
+          </div>
+          <div class="ai-review-list ai-review-list--question">
+            <div class="ai-review-list__title">可追问投顾</div>
+            <div v-for="item in aiAdvice.followUpQuestions" :key="item" class="ai-review-list__item">{{ item }}</div>
+          </div>
         </div>
       </div>
     </SectionCard>
@@ -724,8 +782,141 @@ void loadDetail()
   line-height: 1.6;
 }
 
+.ai-review-empty,
+.ai-review__hero,
+.ai-review-list {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-card);
+}
+
+.ai-review-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.ai-review-empty__title,
+.ai-review-list__title {
+  font-weight: 700;
+  color: var(--color-text-1);
+}
+
+.ai-review-empty__desc {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--color-text-2);
+}
+
+.ai-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-review__hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(32, 86, 173, 0.08), rgba(21, 128, 61, 0.08));
+}
+
+.ai-review__kicker {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.ai-review__decision {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text-1);
+}
+
+.ai-review__summary {
+  margin-top: 8px;
+  color: var(--color-text-2);
+  line-height: 1.7;
+}
+
+.ai-review__risk {
+  align-self: flex-start;
+  min-width: 72px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.ai-review__risk.is-high {
+  background: var(--danger-600);
+}
+
+.ai-review__risk.is-medium {
+  background: var(--warning-600);
+}
+
+.ai-review__risk.is-low {
+  background: var(--success-600);
+}
+
+.ai-review__columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ai-review-list {
+  padding: 16px;
+}
+
+.ai-review-list--concern {
+  border-color: rgba(220, 38, 38, 0.24);
+}
+
+.ai-review-list--question {
+  border-color: rgba(37, 99, 235, 0.24);
+}
+
+.ai-review-list__item {
+  position: relative;
+  margin-top: 10px;
+  padding-left: 14px;
+  color: var(--color-text-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ai-review-list__item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
 @media (max-width: 768px) {
   .check-list {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-review-empty,
+  .ai-review__hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-review__columns {
     grid-template-columns: 1fr;
   }
 }

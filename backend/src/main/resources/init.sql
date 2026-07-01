@@ -4141,4 +4141,88 @@ CREATE TABLE `transaction_record`  (
 -- ----------------------------
 INSERT INTO `transaction_record` VALUES (1, 2, 3, '2', 'SUBSCRIBE', 10000.00, 'COMPLETED', '2026-06-27 04:07:27');
 
+-- ----------------------------
+-- Table structure for user_risk_profile
+-- ----------------------------
+DROP TABLE IF EXISTS `user_risk_assessment_answer`;
+DROP TABLE IF EXISTS `user_risk_assessment`;
+DROP TABLE IF EXISTS `user_risk_profile`;
+CREATE TABLE `user_risk_profile` (
+                                      `id` bigint NOT NULL AUTO_INCREMENT,
+                                      `user_id` bigint NOT NULL COMMENT '用户ID',
+                                      `risk_level` varchar(8) NOT NULL COMMENT '风险等级：R1/R2/R3/R4/R5',
+                                      `risk_score` int NOT NULL COMMENT '综合风险分数：0~100',
+                                      `capacity_score` int NOT NULL DEFAULT 0 COMMENT '风险承受能力分',
+                                      `attitude_score` int NOT NULL DEFAULT 0 COMMENT '风险偏好态度分',
+                                      `knowledge_score` int NOT NULL DEFAULT 0 COMMENT '投资知识经验分',
+                                      `liquidity_score` int NOT NULL DEFAULT 0 COMMENT '流动性需求分',
+                                      `investment_horizon_months` int NULL DEFAULT NULL COMMENT '计划投资期限（月）',
+                                      `max_drawdown_tolerance` decimal(6,4) NULL DEFAULT NULL COMMENT '最大回撤容忍度',
+                                      `experience_level` varchar(32) NULL DEFAULT NULL COMMENT '投资经验：NEW/BEGINNER/EXPERIENCED/PROFESSIONAL',
+                                      `investment_goal` varchar(32) NULL DEFAULT NULL COMMENT '投资目标：LIQUIDITY/STABLE/GROWTH/AGGRESSIVE/RETIREMENT',
+                                      `liquidity_need` varchar(32) NULL DEFAULT NULL COMMENT '流动性需求：HIGH/MEDIUM/LOW',
+                                      `income_range` varchar(32) NULL DEFAULT NULL COMMENT '年收入区间',
+                                      `asset_range` varchar(32) NULL DEFAULT NULL COMMENT '金融资产区间',
+                                      `profile_tags` json NULL COMMENT '画像标签',
+                                      `profile_summary` varchar(512) NULL DEFAULT NULL COMMENT '画像摘要',
+                                      `source` varchar(32) NOT NULL DEFAULT 'QUESTIONNAIRE' COMMENT '来源：QUESTIONNAIRE/BEHAVIOR/AI/MANUAL/MIXED',
+                                      `status` varchar(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/EXPIRED',
+                                      `assessed_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '测评时间',
+                                      `expires_at` datetime NULL DEFAULT NULL COMMENT '过期时间',
+                                      `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                      `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                      PRIMARY KEY (`id`) USING BTREE,
+                                      UNIQUE INDEX `uk_user_risk_profile_user`(`user_id` ASC) USING BTREE,
+                                      INDEX `idx_user_risk_profile_level`(`risk_level` ASC) USING BTREE,
+                                      INDEX `idx_user_risk_profile_status`(`status` ASC) USING BTREE,
+                                      CONSTRAINT `fk_user_risk_profile_user` FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户当前风险画像表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for user_risk_assessment
+-- ----------------------------
+CREATE TABLE `user_risk_assessment` (
+                                         `id` bigint NOT NULL AUTO_INCREMENT,
+                                         `user_id` bigint NOT NULL COMMENT '用户ID',
+                                         `assessment_no` varchar(64) NOT NULL COMMENT '测评流水号',
+                                         `questionnaire_version` varchar(32) NOT NULL DEFAULT 'v1' COMMENT '问卷版本',
+                                         `risk_level` varchar(8) NOT NULL COMMENT '测评结果：R1/R2/R3/R4/R5',
+                                         `risk_score` int NOT NULL COMMENT '综合风险分数：0~100',
+                                         `capacity_score` int NOT NULL DEFAULT 0 COMMENT '风险承受能力分',
+                                         `attitude_score` int NOT NULL DEFAULT 0 COMMENT '风险偏好态度分',
+                                         `knowledge_score` int NOT NULL DEFAULT 0 COMMENT '投资知识经验分',
+                                         `liquidity_score` int NOT NULL DEFAULT 0 COMMENT '流动性需求分',
+                                         `investment_horizon_months` int NULL DEFAULT NULL COMMENT '计划投资期限（月）',
+                                         `max_drawdown_tolerance` decimal(6,4) NULL DEFAULT NULL COMMENT '最大回撤容忍度',
+                                         `result_summary` varchar(512) NULL DEFAULT NULL COMMENT '测评结果摘要',
+                                         `raw_result_json` json NULL COMMENT '完整测评计算结果快照',
+                                         `source` varchar(32) NOT NULL DEFAULT 'QUESTIONNAIRE' COMMENT 'QUESTIONNAIRE/BEHAVIOR/AI/MANUAL/MIXED',
+                                         `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                         PRIMARY KEY (`id`) USING BTREE,
+                                         UNIQUE INDEX `uk_user_risk_assessment_no`(`assessment_no` ASC) USING BTREE,
+                                         INDEX `idx_user_risk_assessment_user`(`user_id` ASC, `created_at` ASC) USING BTREE,
+                                         INDEX `idx_user_risk_assessment_level`(`risk_level` ASC) USING BTREE,
+                                         CONSTRAINT `fk_user_risk_assessment_user` FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户风险测评历史表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for user_risk_assessment_answer
+-- ----------------------------
+CREATE TABLE `user_risk_assessment_answer` (
+                                                `id` bigint NOT NULL AUTO_INCREMENT,
+                                                `assessment_id` bigint NOT NULL COMMENT '测评记录ID',
+                                                `question_code` varchar(64) NOT NULL COMMENT '题目编码',
+                                                `question_title` varchar(255) NOT NULL COMMENT '题目标题',
+                                                `option_code` varchar(64) NULL DEFAULT NULL COMMENT '选项编码',
+                                                `option_text` varchar(255) NULL DEFAULT NULL COMMENT '选项文本',
+                                                `answer_value` varchar(255) NULL DEFAULT NULL COMMENT '答案值',
+                                                `score` int NOT NULL DEFAULT 0 COMMENT '本题得分',
+                                                `dimension` varchar(32) NOT NULL COMMENT '维度：CAPACITY/ATTITUDE/KNOWLEDGE/LIQUIDITY/HORIZON',
+                                                `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                                PRIMARY KEY (`id`) USING BTREE,
+                                                INDEX `idx_risk_answer_assessment`(`assessment_id` ASC) USING BTREE,
+                                                INDEX `idx_risk_answer_dimension`(`dimension` ASC) USING BTREE,
+                                                CONSTRAINT `fk_risk_answer_assessment` FOREIGN KEY (`assessment_id`) REFERENCES `user_risk_assessment` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户风险测评答案明细表' ROW_FORMAT = Dynamic;
+
 SET FOREIGN_KEY_CHECKS = 1;

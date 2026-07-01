@@ -39,6 +39,7 @@ const allMenus: MenuItem[] = [
   { label: '我的订阅', path: '/my-subscriptions', group: '用户端', roles: ['USER'] },
   { label: '管理后台', path: '/admin/dashboard', group: '系统管理', roles: ['ADMIN'] },
   { label: '用户管理', path: '/admin/users', group: '系统管理', roles: ['ADMIN'] },
+  { label: '账号中心', path: '/account', group: '通用' },
   { label: '通知中心', path: '/notifications', group: '通用', roles: ['USER', 'ADVISOR', 'REVIEWER', 'ADMIN'] },
   { label: '交易记录', path: '/transactions', group: '通用', roles: ['USER'] }
 ]

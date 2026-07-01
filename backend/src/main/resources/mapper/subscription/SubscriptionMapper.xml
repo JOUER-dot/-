@@ -102,9 +102,24 @@
         </if>
     </sql>
 
+    <sql id="SubscriptionListFromSimple">
+        from advisor_product_subscription s
+                 inner join advisor_product p on p.id = s.product_id
+                 left join (
+            select n1.product_id, n1.nav, n1.cum_return
+            from advisor_product_nav n1
+                     inner join (
+                select product_id, max(nav_date) as max_nav_date
+                from advisor_product_nav
+                group by product_id
+            ) latest on latest.product_id = n1.product_id and latest.max_nav_date = n1.nav_date
+        ) nav on nav.product_id = p.id
+        where s.user_id = #{userId}
+    </sql>
+
     <select id="selectSubscriptionsByUserId" resultType="com.finance.roboadvisor.subscription.vo.MySubscriptionItemVO">
         select <include refid="SubscriptionListColumns"/>
-        <include refid="SubscriptionListFrom"/>
+        <include refid="SubscriptionListFromSimple"/>
         order by s.created_at desc, s.id desc
     </select>
 

@@ -3,6 +3,8 @@ package com.finance.roboadvisor.common.exception;
 import com.finance.roboadvisor.common.api.ApiResult;
 import com.finance.roboadvisor.common.api.ResultCode;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -11,6 +13,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
     public ApiResult<Void> handleBusinessException(BusinessException ex) {
@@ -49,6 +53,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ApiResult<Void> handleException(Exception ex) {
-        return ApiResult.failed(ResultCode.SYSTEM_ERROR, ex.getMessage());
+        log.error("Unhandled exception: ", ex);
+        return ApiResult.failed(ResultCode.SYSTEM_ERROR, ex.getMessage() != null ? ex.getMessage() : "服务器内部错误，请联系管理员");
     }
 }

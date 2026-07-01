@@ -36,6 +36,14 @@ password: ${DB_PASSWORD:你的密码}
 
 ### 3. 启动后端
 
+如果要启用真实 DeepSeek AI 助手，请先在当前终端设置环境变量，不要把 API Key 写入配置文件或提交到 Git：
+
+```powershell
+$env:DEEPSEEK_API_KEY="你的 DeepSeek API Key"
+# 可选：默认 deepseek-v4-flash，也可切换为 deepseek-v4-pro
+$env:DEEPSEEK_MODEL="deepseek-v4-flash"
+```
+
 ```bash
 cd backend
 mvn spring-boot:run
@@ -44,6 +52,8 @@ mvn spring-boot:run
 等待控制台输出 `Started RoboAdvisorApplication` 即启动成功。
 
 后端默认运行在 `http://localhost:8081`
+
+未配置 `DEEPSEEK_API_KEY` 时，AI 助手会自动使用本地 mock 回复，方便离线开发。
 
 ### 4. 启动前端
 
